@@ -30,6 +30,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import argparse
 from datasets import load_dataset
 import os
+from rag.component.llms import LLMs
+import tools.apis as apis
+from tools.notebook.apis import Notebook
+from tools.planner.apis import Planner
 
 OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 GOOGLE_API_KEY = os.environ['GOOGLE_API_KEY']
@@ -38,10 +42,9 @@ pd.options.display.max_info_columns = 200
 
 os.environ['TIKTOKEN_CACHE_DIR'] = './tmp'
 
-actionMapping = {"FlightSearch": "flights", "AttractionSearch": "attractions",
-                 "GoogleDistanceMatrix": "googleDistanceMatrix", "AccommodationSearch": "accommodation",
-                 "RestaurantSearch": "restaurants", "Planner": "planner", "NotebookWrite": "notebook",
-                 "CitySearch": "cities"}
+actionMapping = {'restaurant_info':'restaurant_info', 'attraction_info':'attraction_info',
+                 'restaurant_distance':'attraction_distance', 'attraction_distance':'attraction_distance',
+                 'notebook':'notebook','planner':'planner'}
 
 
 class CityError(Exception):
@@ -72,11 +75,11 @@ class ReactAgent:
                  args,
                  mode: str = 'zero_shot',
                  tools: List[str] = None,
-                 max_steps: int = 30,
+                 max_steps: int = 10,
                  max_retries: int = 3,
                  illegal_early_stop_patience: int = 3,
-                 react_llm_name='gpt-3.5-turbo-1106',
-                 planner_llm_name='gpt-3.5-turbo-1106',
+                 react_llm_name='glm-4-plus',
+                 planner_llm_name='glm-4-plus',
                  #  logs_path = '../logs/',
                  city_file_path='../database/background/citySet.txt'
                  ) -> None:
@@ -96,62 +99,15 @@ class ReactAgent:
         self.current_observation = ''
         self.current_data = None
 
-        if 'gpt-3.5' in react_llm_name:
-            stop_list = ['\n']
-            self.max_token_length = 15000
-            self.llm = ChatOpenAI(temperature=1,
-                                  max_tokens=256,
-                                  model_name=react_llm_name,
-                                  openai_api_key=OPENAI_API_KEY,
-                                  model_kwargs={"stop": stop_list})
-
-        elif 'gpt-4' in react_llm_name:
-            stop_list = ['\n']
-            self.max_token_length = 30000
-            self.llm = ChatOpenAI(temperature=0,
-                                  max_tokens=256,
-                                  model_name=react_llm_name,
-                                  openai_api_key=OPENAI_API_KEY,
-                                  model_kwargs={"stop": stop_list})
-
-        elif react_llm_name in ['mistral-7B-32K']:
-            stop_list = ['\n']
-            self.max_token_length = 30000
-            self.llm = ChatOpenAI(temperature=0,
-                                  max_tokens=256,
-                                  openai_api_key="EMPTY",
-                                  openai_api_base="http://localhost:8301/v1",
-                                  model_name="gpt-3.5-turbo",
-                                  model_kwargs={"stop": stop_list})
-
-        elif react_llm_name in ['mixtral']:
-            stop_list = ['\n']
-            self.max_token_length = 30000
-            self.llm = ChatOpenAI(temperature=0,
-                                  max_tokens=256,
-                                  openai_api_key="EMPTY",
-                                  openai_api_base="http://localhost:8501/v1",
-                                  model_name="gpt-3.5-turbo",
-                                  model_kwargs={"stop": stop_list})
-
-        elif react_llm_name in ['ChatGLM3-6B-32K']:
-            stop_list = ['\n']
-            self.max_token_length = 30000
-            self.llm = ChatOpenAI(
-                temperature=0,
-                max_tokens=256,
-                openai_api_key="EMPTY",
-                openai_api_base="http://localhost:8501/v1",
-                model_name="gpt-3.5-turbo",
-                model_kwargs={"stop": stop_list})
-
-        elif react_llm_name in ['gemini']:
-            self.llm = ChatGoogleGenerativeAI(temperature=0, model="gemini-pro", google_api_key=GOOGLE_API_KEY)
-            self.max_token_length = 30000
+        if 'glm-4' in react_llm_name:
+            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/xihu_1")
+        else:
+            print("LLM's name is getting wrong")
+            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/xihu_1")
 
         self.illegal_early_stop_patience = illegal_early_stop_patience
 
-        self.tools = self.load_tools(tools, planner_model_name=planner_llm_name)
+        self.tools = self.load_tools(tools)
         self.max_retries = max_retries
         self.retry_record = {key: 0 for key in self.tools}
         self.retry_record['invalidAction'] = 0
@@ -260,178 +216,123 @@ class ReactAgent:
                         self.finished = True
                         return
 
-            if action_type == 'FlightSearch':
+            if action_type == 'restaurant_info':
                 try:
-                    if validate_date_format(action_arg.split(', ')[2]) and validate_city_format(
-                            action_arg.split(', ')[0], self.city_set) and validate_city_format(
-                            action_arg.split(', ')[1], self.city_set):
+                    if True:
                         self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
                                                                   'Masked due to limited length. Make sure the data has been written in Notebook.')
-                        self.current_data = self.tools['flights'].run(action_arg.split(', ')[0],
-                                                                      action_arg.split(', ')[1],
-                                                                      action_arg.split(', ')[2])
+                        self.current_data = self.tools[action_type].run(action_arg)
                         self.current_observation = str(to_string(self.current_data))
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
-                except DateError:
-                    self.retry_record['flights'] += 1
-                    self.current_observation = f"'{action_arg.split(', ')[2]}' is not in the format YYYY-MM-DD"
-                    self.scratchpad += f"'{action_arg.split(', ')[2]}' is not in the format YYYY-MM-DD"
-                    self.json_log[-1]['state'] = f'Illegal args. DateError'
-
                 except ValueError as e:
-                    self.retry_record['flights'] += 1
+                    self.retry_record['restaurant_info'] += 1
                     self.current_observation = str(e)
                     self.scratchpad += str(e)
                     self.json_log[-1]['state'] = f'Illegal args. City Error'
 
                 except Exception as e:
                     print(e)
-                    self.retry_record['flights'] += 1
-                    self.current_observation = f'Illegal Flight Search. Please try again.'
+                    self.retry_record['restaurant_info'] += 1
+                    self.current_observation = f'Illegal Restaurant info Search. Please try again.'
                     self.scratchpad += f'Illegal Flight Search. Please try again.'
                     self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-            elif action_type == 'AttractionSearch':
+            elif action_type == 'restaurant_distance':
 
                 try:
-                    if validate_city_format(action_arg, self.city_set):
+                    if True:
                         self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip().strip(),
                                                                   'Masked due to limited length. Make sure the data has been written in Notebook.')
-                        self.current_data = self.tools['attractions'].run(action_arg)
+                        self.current_data = self.tools[action_type].run_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
                 except ValueError as e:
-                    self.retry_record['attractions'] += 1
+                    self.retry_record[action_type] += 1
                     self.current_observation = str(e)
                     self.scratchpad += str(e)
                     self.json_log[-1]['state'] = f'Illegal args. City Error'
                 except Exception as e:
                     print(e)
-                    self.retry_record['attractions'] += 1
+                    self.retry_record[action_type] += 1
                     self.current_observation = f'Illegal Attraction Search. Please try again.'
                     self.scratchpad += f'Illegal Attraction Search. Please try again.'
                     self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-            elif action_type == 'AccommodationSearch':
+            elif action_type == 'attraction_info':
 
                 try:
-                    if validate_city_format(action_arg, self.city_set):
+                    if True:
                         self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip().strip(),
                                                                   'Masked due to limited length. Make sure the data has been written in Notebook.')
-                        self.current_data = self.tools['accommodations'].run(action_arg)
-                        self.current_observation = to_string(self.current_data).strip('\n').strip()
-                        self.scratchpad += self.current_observation
-                        self.__reset_record()
-                        self.json_log[-1]['state'] = f'Successful'
-                except ValueError as e:
-                    self.retry_record['accommodations'] += 1
-                    self.current_observation = str(e)
-                    self.scratchpad += str(e)
-                    self.json_log[-1]['state'] = f'Illegal args. City Error'
-                except Exception as e:
-                    print(e)
-                    self.retry_record['accommodations'] += 1
-                    self.current_observation = f'Illegal Accommodation Search. Please try again.'
-                    self.scratchpad += f'Illegal Accommodation Search. Please try again.'
-                    self.json_log[-1]['state'] = f'Illegal args. Other Error'
-
-            elif action_type == 'RestaurantSearch':
-
-                try:
-                    if validate_city_format(action_arg, self.city_set):
-                        self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip().strip(),
-                                                                  'Masked due to limited length. Make sure the data has been written in Notebook.')
-                        self.current_data = self.tools['restaurants'].run(action_arg)
+                        self.current_data = self.tools[action_type].run(action_arg)
                         self.current_observation = to_string(self.current_data).strip()
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
                 except ValueError as e:
-                    self.retry_record['restaurants'] += 1
+                    self.retry_record[action_type] += 1
                     self.current_observation = str(e)
                     self.scratchpad += str(e)
                     self.json_log[-1]['state'] = f'Illegal args. City Error'
 
                 except Exception as e:
                     print(e)
-                    self.retry_record['restaurants'] += 1
+                    self.retry_record[action_type] += 1
                     self.current_observation = f'Illegal Restaurant Search. Please try again.'
                     self.scratchpad += f'Illegal Restaurant Search. Please try again.'
                     self.json_log = f'Illegal args. Other Error'
 
-            elif action_type == "CitySearch":
+            elif action_type == 'attraction_distance':
                 try:
                     self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
                                                               'Masked due to limited length. Make sure the data has been written in Notebook.')
-                    # self.current_data = self.tools['cities'].run(action_arg)
-                    self.current_observation = to_string(self.tools['cities'].run(action_arg)).strip()
+                    self.current_data = self.tools[action_type].run(action_arg)
+                    self.current_observation = to_string(self.tools[action_type].run(action_arg.split(', ')[0], action_arg.split(', ')[1])).strip()
                     self.scratchpad += self.current_observation
                     self.__reset_record()
                     self.json_log[-1]['state'] = f'Successful'
 
                 except ValueError as e:
-                    self.retry_record['cities'] += 1
+                    self.retry_record[action_type] += 1
                     self.current_observation = str(e)
                     self.scratchpad += str(e)
                     self.json_log[-1]['state'] = f'Illegal args. State Error'
 
                 except Exception as e:
                     print(e)
-                    self.retry_record['cities'] += 1
+                    self.retry_record[action_type] += 1
                     self.current_observation = f'Illegal City Search. Please try again.'
                     self.scratchpad += f'Illegal City Search. Please try again.'
                     self.json_log = f'Illegal args. Other Error'
 
-
-            elif action_type == 'GoogleDistanceMatrix':
-
+            elif action_type == 'notebook':
                 try:
                     self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
                                                               'Masked due to limited length. Make sure the data has been written in Notebook.')
-                    self.current_data = self.tools['googleDistanceMatrix'].run(action_arg.split(', ')[0],
-                                                                               action_arg.split(', ')[1],
-                                                                               action_arg.split(', ')[2])
-                    self.current_observation = to_string(self.current_data)
+                    self.current_observation = str(self.tools[action_type].write(self.current_data, action_arg))
                     self.scratchpad += self.current_observation
                     self.__reset_record()
                     self.json_log[-1]['state'] = f'Successful'
 
                 except Exception as e:
                     print(e)
-                    self.retry_record['googleDistanceMatrix'] += 1
-                    self.current_observation = f'Illegal GoogleDistanceMatrix. Please try again.'
-                    self.scratchpad += f'Illegal GoogleDistanceMatrix. Please try again.'
-                    self.json_log[-1]['state'] = f'Illegal args. Other Error'
-
-
-            elif action_type == 'NotebookWrite':
-                try:
-                    self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
-                                                              'Masked due to limited length. Make sure the data has been written in Notebook.')
-                    self.current_observation = str(self.tools['notebook'].write(self.current_data, action_arg))
-                    self.scratchpad += self.current_observation
-                    self.__reset_record()
-                    self.json_log[-1]['state'] = f'Successful'
-
-                except Exception as e:
-                    print(e)
-                    self.retry_record['notebook'] += 1
+                    self.retry_record[action_type] += 1
                     self.current_observation = f'{e}'
                     self.scratchpad += f'{e}'
                     self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
 
-            elif action_type == "Planner":
+            elif action_type == "planner":
                 # try:
 
                 self.current_observation = str(
-                    self.tools['planner'].run(str(self.tools['notebook'].list_all()), action_arg))
+                    self.tools[action_type].run(str(self.tools['notebook'].list_all()), action_arg))
                 self.scratchpad += self.current_observation
                 self.answer = self.current_observation
                 self.__reset_record()
@@ -439,8 +340,7 @@ class ReactAgent:
 
             else:
                 self.retry_record['invalidAction'] += 1
-                self.current_observation = 'Invalid Action. Valid Actions are  FlightSearch[Departure City, Destination City, Date] / ' \
-                                           'AccommodationSearch[City] /  RestaurantSearch[City] / NotebookWrite[Short Description] / AttractionSearch[City] / CitySearch[State] / GoogleDistanceMatrix[Origin, Destination, Mode] and Planner[Query].'
+                self.current_observation = 'Invalid Action.'
                 self.scratchpad += self.current_observation
                 self.json_log[-1]['state'] = f'invalidAction'
 
@@ -467,7 +367,10 @@ class ReactAgent:
         while True:
             try:
                 # print(self._build_agent_prompt())
-                if self.react_name == 'gemini':
+                if self.react_name == 'glm-4':
+                    # TODO How to get response from GLM-4
+                    request = format_step(self.llm.invoke(self._build_agent_prompt(), stop=['\n']).content)
+                elif self.react_name == 'gemini':
                     request = format_step(self.llm.invoke(self._build_agent_prompt(), stop=['\n']).content)
                 else:
                     request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
@@ -510,17 +413,18 @@ class ReactAgent:
         self.retry_record = {key: 0 for key in self.retry_record}
         self.retry_record['invalidAction'] = 0
 
-    def load_tools(self, tools: List[str], planner_model_name=None) -> Dict[str, Any]:
+    def load_tools(self, tools: List[str]) -> Dict[str, Any]:
         tools_map = {}
         for tool_name in tools:
-            module = importlib.import_module("tools.{}.apis".format(tool_name))
-
-            # Avoid instantiating the planner tool twice
-            if tool_name == 'planner' and planner_model_name is not None:
-                tools_map[tool_name] = getattr(module, tool_name[0].upper() + tool_name[1:])(
-                    model_name=planner_model_name)
-            else:
-                tools_map[tool_name] = getattr(module, tool_name[0].upper() + tool_name[1:])()
+            if tool_name == 'restaurant_info' or tool_name == 'restaurant_distance':
+                tools_map[tool_name] = apis.Restaurants()
+            elif tool_name == 'attraction_info' or tool_name == 'attraction_distance':
+                tools_map[tool_name] = apis.Attractions()
+            elif tool_name == 'notebook':
+                tools_map[tool_name] = Notebook()
+            elif tool_name == 'planner':
+                # TODO set Planner parameters
+                tools_map[tool_name] = Planner()
         return tools_map
 
     def load_city(self, city_set_path: str) -> List[str]:
@@ -583,29 +487,6 @@ def normalize_answer(s):
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
-def EM(answer, key) -> bool:
-    return normalize_answer(str(answer)) == normalize_answer(str(key))
-
-
-def remove_observation_lines(text, step_n):
-    pattern = re.compile(rf'^Observation {step_n}.*', re.MULTILINE)
-    return pattern.sub('', text)
-
-
-def validate_date_format(date_str: str) -> bool:
-    pattern = r'^\d{4}-\d{2}-\d{2}$'
-
-    if not re.match(pattern, date_str):
-        raise DateError
-    return True
-
-
-def validate_city_format(city_str: str, city_set: list) -> bool:
-    if city_str not in city_set:
-        raise ValueError(f"{city_str} is not valid city in {str(city_set)}.")
-    return True
-
-
 def parse_args_string(s: str) -> dict:
     # Split the string by commas
     segments = s.split(",")
@@ -656,8 +537,7 @@ def to_string(data) -> str:
 
 if __name__ == '__main__':
 
-    tools_list = ["notebook", "flights", "attractions", "accommodations", "restaurants", "googleDistanceMatrix",
-                  "planner", "cities"]
+    tools_list = ['restaurant_info', 'attraction_info', 'restaurant_distance', 'attraction_distance', 'notebook', 'planner']
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="validation")
