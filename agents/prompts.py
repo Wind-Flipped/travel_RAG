@@ -1,103 +1,114 @@
 from langchain.prompts import PromptTemplate
 
 
-ZEROSHOT_REACT_INSTRUCTION = """Collect information for a query plan using interleaving 'Thought', 'Action', and 'Observation' steps. Ensure you gather valid information related to transportation, dining, attractions, and accommodation. All information should be written in Notebook, which will then be input into the Planner tool. Note that the nested use of tools is prohibited. 'Thought' can reason about the current situation, and 'Action' can have 8 different types:
-(1) FlightSearch[Departure City, Destination City, Date]:
-Description: A flight information retrieval tool.
+ZEROSHOT_REACT_INSTRUCTION = """Collect information for a query plan using interleaving 'Thought', 'Action', and 'Observation' steps. Ensure you gather valid information related to dining and attractions. All information should be written in Notebook, which will then be input into the Planner tool. Note that the nested use of tools is prohibited. 'Thought' can reason about the current situation, and 'Action' can have 6 different types:
+(1) restaurant_info[Restaurant name]:
+Description: A restaurant information retrieval tool.
 Parameters:
-Departure City: The city you'll be flying out from.
-Destination City: The city you aim to reach.
-Date: The date of your travel in YYYY-MM-DD format.
-Example: FlightSearch[New York, London, 2022-10-01] would fetch flights from New York to London on October 1, 2022.
+Restaurant name: The name of the restaurant you would like to know more about.
+Example: restaurant_info[KFC] would get the information of KFC, including latitude and longitude, cuisines, etc.
 
-(2) GoogleDistanceMatrix[Origin, Destination, Mode]:
-Description: Estimate the distance, time and cost between two cities.
+(2) restaurant_distance[restaurant_1, restaurant_2]:
+Description: Estimate the distance from two restaurants.
 Parameters:
-Origin: The departure city of your journey.
-Destination: The destination city of your journey.
-Mode: The method of transportation. Choices include 'self-driving' and 'taxi'.
-Example: GoogleDistanceMatrix[Paris, Lyon, self-driving] would provide driving distance, time and cost between Paris and Lyon.
+restaurant_1: The name of first restaurant.
+restaurant_2: The name of second restaurant.
+Example: restaurant_distance[Xiba tofu, Rest Hotpot] would provide distance between restaurant Xiba tofu and restaurant Rest Hotpot.
 
-(3) AccommodationSearch[City]:
-Description: Discover accommodations in your desired city.
-Parameter: City - The name of the city where you're seeking accommodation.
-Example: AccommodationSearch[Rome] would present a list of hotel rooms in Rome.
+(3) attraction_info[attraction name]:
+Description: An attraction information retrieval tool.
+Parameters:
+attraction name: The name of the attraction you would like to know more about.
+Example: attraction_info[Forbidden City] would get the information of Forbidden City, including latitude and longitude.
 
-(4) RestaurantSearch[City]:
-Description: Explore dining options in a city of your choice.
-Parameter: City – The name of the city where you're seeking restaurants.
-Example: RestaurantSearch[Tokyo] would show a curated list of restaurants in Tokyo.
+(4) attraction_distance[attraction_1, attraction_2]:
+Description: Estimate the distance from two restaurants.
+Parameters:
+attraction_1: The name of first attraction.
+attraction_2: The name of second attraction.
+Example: restaurant_distance[Summer Palace, Forbidden City] would provide distance between attraction Forbidden City and attraction Summer Palace.
 
-(5) AttractionSearch[City]:
-Description: Find attractions in a city of your choice.
-Parameter: City – The name of the city where you're seeking attractions.
-Example: AttractionSearch[London] would return attractions in London.
-
-(6) CitySearch[State]
-Description: Find cities in a state of your choice.
-Parameter: State – The name of the state where you're seeking cities.
-Example: CitySearch[California] would return cities in California.
-
-(7) NotebookWrite[Short Description]
+(5) NotebookWrite[Short Description]
 Description: Writes a new data entry into the Notebook tool with a short description. This tool should be used immediately after FlightSearch, AccommodationSearch, AttractionSearch, RestaurantSearch or GoogleDistanceMatrix. Only the data stored in Notebook can be seen by Planner. So you should write all the information you need into Notebook.
 Parameters: Short Description - A brief description or label for the stored data. You don't need to write all the information in the description. The data you've searched for will be automatically stored in the Notebook.
-Example: NotebookWrite[Flights from Rome to Paris in 2022-02-01] would store the informatrion of flights from Rome to Paris in 2022-02-01 in the Notebook.
+Example: NotebookWrite[Attraction infomation on Forbidden City] would store the attraction infomation on Forbidden City in the Notebook.
 
-(8) Planner[Query]
+(6) Planner[Query]
 Description: A smart planning tool that crafts detailed plans based on user input and the information stroed in Notebook.
 Parameters: 
 Query: The query from user.
-Example: Planner[Give me a 3-day trip plan from Seattle to New York] would return a detailed 3-day trip plan.
+Example: Planner[Give me a 1-day trip plan in Hangzhou city] would return a detailed 1-day trip plan in Hangzhou city.
 You should use as many as possible steps to collect engough information to input to the Planner tool. 
 
 Each action only calls one function once. Do not add any description in the action.
 
 Query: {query}{scratchpad}"""
 
+ZEROSHOT_REACT_INSTRUCTION_ZH = '''使用交替进行的“思考”、“行动”和“观察”步骤收集查询计划所需的信息。确保收集与餐饮和景点相关的有效信息。所有信息应写入笔记本，然后输入到规划工具中。请注意，不允许嵌套使用工具。“思考”可以推理当前的情况，“行动”可以有六种不同类型：
 
+(1) restaurant_info[餐厅名称]： 描述：一个餐厅信息检索工具。 参数： 餐厅名称：您想了解更多的餐厅名称。 示例：restaurant_info[KFC] 会获取KFC的相关信息，包括经纬度、菜系等。
+
+(2) restaurant_distance[餐厅1, 餐厅2]： 描述：估算两家餐厅之间的距离。 参数： 餐厅1：第一家餐厅的名称。 餐厅2：第二家餐厅的名称。 示例：restaurant_distance[Xiba tofu, Rest Hotpot] 会提供餐厅 Xiba tofu 和餐厅 Rest Hotpot 之间的距离。
+
+(3) attraction_info[景点名称]： 描述：一个景点信息检索工具。 参数： 景点名称：您想了解更多的景点名称。 示例：attraction_info[Forbidden City] 会获取Forbidden City的相关信息，包括经纬度。
+
+(4) attraction_distance[景点1, 景点2]： 描述：估算两个景点之间的距离。 参数： 景点1：第一个景点的名称。 景点2：第二个景点的名称。 示例：attraction_distance[Summer Palace, Forbidden City] 会提供景点 Forbidden City 和景点 Summer Palace 之间的距离。
+
+(5) NotebookWrite[简短描述]： 描述：将新的数据条目写入笔记本工具，附上简短描述。此工具应在FlightSearch、AccommodationSearch、AttractionSearch、RestaurantSearch 或 GoogleDistanceMatrix 后立即使用。只有存储在笔记本中的数据可以被规划工具看到。因此，您应将所有需要的信息写入笔记本。 参数：简短描述 - 存储数据的简短描述或标签。您无需在描述中写出所有信息，您搜索的数据会自动存储在笔记本中。 示例：NotebookWrite[Forbidden City的景点信息] 会将Forbidden City的景点信息存储在笔记本中。
+
+(6) Planner[查询]： 描述：一个智能规划工具，根据用户输入和存储在笔记本中的信息制定详细的计划。 参数： 查询：用户的查询。 示例：Planner[给我一个在杭州的1日游计划] 会返回一个详细的杭州1日游计划。 您应该尽可能多地使用步骤来收集足够的信息并输入到规划工具中。
+
+每个行动仅调用一次某个功能。请不要在行动中添加任何描述。
+
+查询：{query}{scratchpad}
+
+'''
 
 zeroshot_react_agent_prompt = PromptTemplate(
                         input_variables=["query", "scratchpad"],
                         template=ZEROSHOT_REACT_INSTRUCTION,
                         )
+zeroshot_react_agent_prompt_zh = PromptTemplate(
+                        input_variables=["query", "scratchpad"],
+                        template=ZEROSHOT_REACT_INSTRUCTION_ZH,
+                        )
 
-PLANNER_INSTRUCTION = """You are a proficient planner. Based on the provided information and query, please give me a detailed plan, including specifics such as flight numbers (e.g., F0123456), restaurant names, and accommodation names. Note that all the information in your plan should be derived from the provided data. You must adhere to the format given in the example. Additionally, all details should align with commonsense. The symbol '-' indicates that information is unnecessary. For example, in the provided sample, you do not need to plan after returning to the departure city. When you travel to two cities in one day, you should note it in the 'Current City' section as in the example (i.e., from A to B).
+PLANNER_INSTRUCTION = """You are a proficient planner. Based on the provided information and query, please give me a detailed plan, including specifics such as restaurant names and accommodation names. Note that all the information in your plan should be derived from the provided data. You must adhere to the format given in the example. Additionally, all details should align with commonsense. The symbol '-' indicates that information is unnecessary.
 
 ***** Example *****
-Query: Could you create a travel plan for 7 people from Ithaca to Charlotte spanning 3 days, from March 8th to March 14th, 2022, with a budget of $30,200?
+Query: Could you create a travel plan for 4 people in Hangzhou spanning 1 day,with a budget of 1,200 yuan?
 Travel Plan:
 Day 1:
-Current City: from Ithaca to Charlotte
-Transportation: Flight Number: F3633413, from Ithaca to Charlotte, Departure Time: 05:38, Arrival Time: 07:46
+Transportation: Subway
 Breakfast: Nagaland's Kitchen, Charlotte
-Attraction: The Charlotte Museum of History, Charlotte
+Attraction: Xihu
 Lunch: Cafe Maple Street, Charlotte
 Dinner: Bombay Vada Pav, Charlotte
-Accommodation: Affordable Spacious Refurbished Room in Bushwick!, Charlotte
-
-Day 2:
-Current City: Charlotte
-Transportation: -
-Breakfast: Olive Tree Cafe, Charlotte
-Attraction: The Mint Museum, Charlotte;Romare Bearden Park, Charlotte.
-Lunch: Birbal Ji Dhaba, Charlotte
-Dinner: Pind Balluchi, Charlotte
-Accommodation: Affordable Spacious Refurbished Room in Bushwick!, Charlotte
-
-Day 3:
-Current City: from Charlotte to Ithaca
-Transportation: Flight Number: F3786167, from Charlotte to Ithaca, Departure Time: 21:42, Arrival Time: 23:26
-Breakfast: Subway, Charlotte
-Attraction: Books Monument, Charlotte.
-Lunch: Olive Tree Cafe, Charlotte
-Dinner: Kylin Skybar, Charlotte
-Accommodation: -
 
 ***** Example Ends *****
 
 Given information: {text}
 Query: {query}
 Travel Plan:"""
+
+PLANNER_INSTRUCTION_ZH = """您是一位熟练的规划师。根据提供的信息和查询，请为我提供一份详细的计划，包括餐厅名称和住宿名称等具体内容。请注意，您计划中的所有信息应来自提供的数据。您必须遵循示例中给出的格式。此外，所有细节应符合常识。符号 '-' 表示该信息不必要。
+查询：您能为4人制定一份在杭州的1日游计划，预算为1200元吗？ 
+旅行计划： 
+第1天： 
+交通：地铁 
+早餐：麦当劳 
+上午景点：西湖 
+午餐：麦坡咖啡 
+下午景点： 杭州博物馆
+晚餐：海底捞火锅
+
+***** 示例结束 *****
+
+给定信息：{text}
+查询：{query}
+旅行计划：
+
+"""
 
 COT_PLANNER_INSTRUCTION = """You are a proficient planner. Based on the provided information and query, please give me a detailed plan, including specifics such as flight numbers (e.g., F0123456), restaurant names, and hotel names. Note that all the information in your plan should be derived from the provided data. You must adhere to the format given in the example. Additionally, all details should align with common sense. Attraction visits and meals are expected to be diverse. The symbol '-' indicates that information is unnecessary. For example, in the provided sample, you do not need to plan after returning to the departure city. When you travel to two cities in one day, you should note it in the 'Current City' section as in the example (i.e., from A to B). 
 
@@ -229,6 +240,11 @@ Query: {query}{scratchpad} """
 planner_agent_prompt = PromptTemplate(
                         input_variables=["text","query"],
                         template = PLANNER_INSTRUCTION,
+                        )
+
+planner_agent_prompt_zh = PromptTemplate(
+                        input_variables=["text","query"],
+                        template = PLANNER_INSTRUCTION_ZH,
                         )
 
 cot_planner_agent_prompt = PromptTemplate(

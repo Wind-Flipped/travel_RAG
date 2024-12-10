@@ -1,43 +1,17 @@
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..")))
-from langchain.prompts import PromptTemplate
-from agents.prompts import planner_agent_prompt, cot_planner_agent_prompt, react_planner_agent_prompt,reflect_prompt,react_reflect_planner_agent_prompt, REFLECTION_HEADER
-from langchain.chat_models import ChatOpenAI
-from langchain.llms.base import BaseLLM
-from langchain.schema import (
-    AIMessage,
-    HumanMessage,
-    SystemMessage
-)
-from env import ReactEnv,ReactReflectEnv
-import tiktoken
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
+from agents.prompts import planner_agent_prompt, planner_agent_prompt_zh, cot_planner_agent_prompt, react_planner_agent_prompt,reflect_prompt,react_reflect_planner_agent_prompt, REFLECTION_HEADER
+# from env import ReactEnv,ReactReflectEnv
+
 import re
-import openai
 import time
 from enum import Enum
 from typing import List, Union, Literal
-from langchain_google_genai import ChatGoogleGenerativeAI
 import argparse
+from agents.llms import LLMs
 
-
-OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
-GOOGLE_API_KEY = os.environ['GOOGLE_API_KEY']
-
-
-def catch_openai_api_error():
-    error = sys.exc_info()[0]
-    if error == openai.error.APIConnectionError:
-        print("APIConnectionError")
-    elif error == openai.error.RateLimitError:
-        print("RateLimitError")
-        time.sleep(60)
-    elif error == openai.error.APIError:
-        print("APIError")
-    elif error == openai.error.AuthenticationError:
-        print("AuthenticationError")
-    else:
-        print("API error:", error)
+# OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 
 
 class ReflexionStrategy(Enum):
@@ -50,42 +24,20 @@ class ReflexionStrategy(Enum):
 class Planner:
     def __init__(self,
                  # args,
-                 agent_prompt: PromptTemplate = planner_agent_prompt,
-                 model_name: str = 'gpt-3.5-turbo-1106',
+                 model_name: str = 'glm-4-plus',
+                 agent_prompt = planner_agent_prompt_zh,
                  ) -> None:
 
         self.agent_prompt = agent_prompt
         self.scratchpad: str = ''
         self.model_name = model_name
-        self.enc = tiktoken.encoding_for_model("gpt-3.5-turbo")
 
-        if model_name in  ['mistral-7B-32K']:
-            self.llm = ChatOpenAI(temperature=0,
-                     max_tokens=4096,
-                     openai_api_key="EMPTY", 
-                     openai_api_base="http://localhost:8301/v1", 
-                     model_name="gpt-3.5-turbo")
-        
-        elif model_name in  ['ChatGLM3-6B-32K']:
-            self.llm = ChatOpenAI(temperature=0,
-                     max_tokens=4096,
-                     openai_api_key="EMPTY", 
-                     openai_api_base="http://localhost:8501/v1", 
-                     model_name="gpt-3.5-turbo")
-            
-        elif model_name in ['mixtral']:
-            self.max_token_length = 30000
-            self.llm = ChatOpenAI(temperature=0,
-                     max_tokens=4096,
-                     openai_api_key="EMPTY", 
-                     openai_api_base="http://localhost:8501/v1", 
-                     model_name="YOUR/MODEL/PATH")
-            
-        elif model_name in ['gemini']:
-            self.llm = ChatGoogleGenerativeAI(temperature=0,model="gemini-pro",google_api_key=GOOGLE_API_KEY)
+
+        if 'glm-4' in model_name:
+            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
-            self.llm = ChatOpenAI(model_name=model_name, temperature=0, max_tokens=4096, openai_api_key=OPENAI_API_KEY)
-
+            print("LLM's name is getting wrong")
+            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
         print(f"PlannerAgent {model_name} loaded.")
 
@@ -93,20 +45,17 @@ class Planner:
         if log_file:
             log_file.write('\n---------------Planner\n'+self._build_agent_prompt(text, query))
         # print(self._build_agent_prompt(text, query))
-        if self.model_name in ['gemini']:
-            return str(self.llm.invoke(self._build_agent_prompt(text, query)).content)
+        if 'glm-4' in self.model_name:
+            return str(self.llm(self._build_agent_prompt(text, query)))
         else:
-            if len(self.enc.encode(self._build_agent_prompt(text, query))) > 12000:
-                return 'Max Token Length Exceeded.'
-            else:
-                return self.llm([HumanMessage(content=self._build_agent_prompt(text, query))]).content
+            return str(self.llm(self._build_agent_prompt(text, query)))
 
     def _build_agent_prompt(self, text, query) -> str:
         return self.agent_prompt.format(
             text=text,
             query=query)
 
-
+'''
 class ReactPlanner:
     """
     A question answering ReAct Agent.
@@ -388,6 +337,6 @@ def format_reflections(reflections: List[str],
         return ''
     else:
         return header + 'Reflections:\n- ' + '\n- '.join([r.strip() for r in reflections])
-
+'''
 # if __name__ == '__main__':
     
