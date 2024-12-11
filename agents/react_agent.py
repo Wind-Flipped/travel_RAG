@@ -19,7 +19,7 @@ from datetime import datetime
 from tqdm import tqdm
 import argparse
 import os
-from llms import LLMs
+from llms import LLMs, VectorDatabase
 import tools.apis as apis
 from tools.notebook.apis import Notebook
 from tools.planner.apis import Planner
@@ -349,7 +349,6 @@ class ReactAgent:
             try:
                 # print(self._build_agent_prompt())
                 if 'glm-4' in self.react_name:
-                    # TODO How to get response from GLM-4
                     print("Begin to generate----------")
                     request = format_step(self.llm(self._build_agent_prompt()))
                     print("------------scratchpad-----------")

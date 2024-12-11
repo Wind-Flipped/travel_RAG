@@ -1,5 +1,7 @@
 import pandas as pd
 from pandas import DataFrame
+import os, sys
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 from util.calculate import calculate_distance
 
 
@@ -16,38 +18,48 @@ class Tools:
             name: str,
             ) -> DataFrame:
         """Search for attraction ."""
-        results = self.data[self.data["shopname"] == name]
-        # results = results[results["date"] == date]
-        # if price_order == "asc":
-        #     results = results.sort_values(by=["Average Cost"], ascending=True)
-        # elif price_order == "desc":
-        #     results = results.sort_values(by=["Average Cost"], ascending=False)
-
-        # if rating_order == "asc":
-        #     results = results.sort_values(by=["Aggregate Rating"], ascending=True)
-        # elif rating_order == "desc":
-        #     results = results.sort_values(by=["Aggregate Rating"], ascending=False)
+        results = self.data[self.data['shopname'] == name]
         if len(results) == 0:
-            return f"There is no {name} in this city."
-        return results
+            results = self.data[self.data['shopname'].str.contains(name, case=False, na=False)]
+            if len(results) == 0:
+                return f"There is no {name} in this city."
+            results = results.sort_values(by=["star"], ascending=False).iloc[0].to_dict()
+            return results
+        return results.iloc[0].dropna().to_dict()
 
     def run_for_distance(self,
                          name1: str, name2: str
                          ) -> float:
-        """Search for distance of attractions ."""
-        if len(self.data[self.data["shopname"] == name1]) == 0 or len(self.data[self.data["shopname"] == name2]) == 0:
+        """
+        Search for distance of attractions (km).
+        Return 0 if the name is not found.
+        """
+
+        result1 = self.data[self.data['shopname'] == name1]
+        result2 = self.data[self.data['shopname'] == name2]
+        if len(result1) == 0:
+            result1 = self.data[self.data['shopname'].str.contains(name1, case=False, na=False)]
+        if len(result2) == 0:
+            result2 = self.data[self.data['shopname'].str.contains(name2, case=False, na=False)]
+        if len(result1) == 0:
+            print(f"There is no {name1} in this city.")
+            return 0
+        if len(result2) == 0:
+            print(f"There is no {name2} in this city.")
+            return 0
+        if len(result1) == 0 or len(result2) == 0:
             print(f"There is no {name1} or {name2} in this city.")
             return 0
-        longitude1 = self.data[self.data["shopname"] == name1]["longitude"].values[0]
-        longitude2 = self.data[self.data["shopname"] == name2]["longitude"].values[0]
-        latitude1 = self.data[self.data["shopname"] == name1]["latitude"].values[0]
-        latitude2 = self.data[self.data["shopname"] == name2]["latitude"].values[0]
+        longitude1 = result1.sort_values(by=["star"], ascending=False).iloc[0].to_dict()["longitude"]
+        longitude2 = result2.sort_values(by=["star"], ascending=False).iloc[0].to_dict()["longitude"]
+        latitude1 = result1.sort_values(by=["star"], ascending=False).iloc[0].to_dict()["latitude"]
+        latitude2 = result2.sort_values(by=["star"], ascending=False).iloc[0].to_dict()["latitude"]
 
         return calculate_distance((latitude1, longitude1), (latitude2, longitude2))
 
 
 class Attractions(Tools):
-    def __init__(self, path="database/attraction.csv"):
+    def __init__(self, path="database/new_attraction.csv"):
         super().__init__(path)
         print("Attractions loaded.")
 
@@ -88,5 +100,5 @@ class Restaurants(Tools):
 if __name__ == '__main__':
     attractions = Attractions()
 
-    print(attractions.run("千岛湖梅峰岛景区"))
-    print(attractions.run_for_distance("千岛湖梅峰岛景区", "钱塘江"))
+    print(attractions.run("西湖"))
+    print(attractions.run_for_distance("西湖", "风景区"))

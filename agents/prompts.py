@@ -60,7 +60,9 @@ ZEROSHOT_REACT_INSTRUCTION_ZH = '''使用交替进行的“思考”、“行动
 
 每个行动仅调用一次某个功能。请不要在行动中添加任何描述。
 
-查询：{query}{scratchpad}
+查询：{query}
+可参考的已有相关路线：
+{scratchpad}
 
 '''
 

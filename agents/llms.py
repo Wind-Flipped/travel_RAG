@@ -3,12 +3,13 @@ from embedding import Zhipuembedding
 # from data_chunker import ReadFile
 # from databases import Vectordatabase
 from prompts import zeroshot_react_agent_prompt
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 
-
-
-# 把api_key放在环境变量中,可以在系统环境变量中设置，也可以在代码中设置
-# import os
-# os.environ['OPENAI_API_KEY'] = ''
+from rag.component.embedding import Zhipuembedding
+from rag.component.data_chunker import ReadFile
+from rag.component.databases import Vectordatabase
+from rag.component.request import Request
 
 class LLMs:
     def __init__(self, model_name: str = 'glm-4-0520', temperature: float = 0.9,
@@ -84,6 +85,46 @@ def format_prompt(question: str, info: str) -> str:
     format_info = "\n".join(f"第{index + 1}条数据: {item}" for index, item in enumerate(info))
     return template.format(question=question, info=format_info)
 
+class VectorDatabase:
+    def __init__(self,
+                 rag_database: list[str] = ["/home/wangb/cyo/graduation/rag/databases/hangzhou",
+                                            "/home/wangb/cyo/graduation/rag/databases/hangzhou_poi"]) -> None:
+        # Load vector database and embedding model
+        self.db_route = Vectordatabase()
+        self.db_route.load_vector(rag_database[0])
+        self.db_poi = Vectordatabase()
+        self.db_poi.load_vector(rag_database[1])
+        self.embedding_model = Zhipuembedding()
+        self.history = []
+        # self.divide_request = Request
+
+    def get_related_route_info(self, query: str):
+        # TODO (Use Request to divide query into pos_question and neg_question)
+        pos_question, neg_question = self.function(query)
+        routes, pois = self.query_databases(pos_question, neg_question)
+        return self.query_zh(routes, pois)
+
+    def function(self,query : str):
+        return query, ""
+
+    def query_route(self, pos_question, neg_question):
+        info = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
+        return info
+
+    def query_poi(self, pos_question, neg_question):
+        info = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
+        return info
+
+    def query_databases(self, pos_question, neg_question):
+        routes = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
+        pois = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
+
+        return routes, pois
+    def query_zh(self, route_info, poi_info):
+        format_route_info = "\n".join(f"-第{index + 1}条路线攻略: {item}" for index, item in enumerate(route_info))
+        format_poi_info = "\n".join(f"-第{index + 1}条景点描述: {item}" for index, item in enumerate(poi_info))
+
+        return format_route_info, format_poi_info
 
 class ReactAgent:
     def __init__(self,
