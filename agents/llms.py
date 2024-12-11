@@ -2,7 +2,7 @@ from zhipuai import ZhipuAI
 from embedding import Zhipuembedding
 # from data_chunker import ReadFile
 # from databases import Vectordatabase
-from prompts import zeroshot_react_agent_prompt
+from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 
@@ -128,7 +128,7 @@ class VectorDatabase:
 
 class ReactAgent:
     def __init__(self,
-                 mode: str = 'zero_shot',
+                 mode: str = 'zero_shot_reformat_zh',
                  tools = None,
                  max_steps: int = 10,
                  max_retries: int = 3,
@@ -137,15 +137,27 @@ class ReactAgent:
                  planner_llm_name='glm-4-plus',
                  query = ''):
         self.answer = ''
-        self.agent_prompt = zeroshot_react_agent_prompt
+        self.mode = mode
+        if self.mode == 'zero_shot':
+            self.agent_prompt = zeroshot_react_agent_prompt
+        elif self.mode == 'zero_shot_zh':
+            self.agent_prompt = zeroshot_react_agent_prompt_zh
+        elif self.mode == 'zero_shot_reformat_zh':
+            self.agent_prompt = zeroshot_react_agent_prompt_reformat_zh
         self.query = query
         self.scratchpad = ''
-        self.mode = "zero_shot"
         self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+        self.vector_database = VectorDatabase()
+        self.route_info, self.poi_info = self.vector_database.get_related_route_info(self.query)
     def _build_agent_prompt(self) -> str:
         if self.mode == "zero_shot":
             return self.agent_prompt.format(
                 query=self.query,
+                scratchpad=self.scratchpad)
+        elif self.mode == 'zero_shot_reformat_zh':
+            return self.agent_prompt.format(
+                query=self.query,
+                route_info=self.route_info,
                 scratchpad=self.scratchpad)
 
     def prompt_agent(self) -> str:
@@ -167,6 +179,7 @@ if __name__ == "__main__":
     pos_input = "请推荐一条亲子线路"
     neg_input = "不要去西湖"
     input = "Please recommend a one-day tour in Hangzhou with a budget of less than 200 yuan."
+    input = "请推荐预算在200元以下的杭州一日游。"
     # response = llm.chat(pos_input, neg_input, "explain")
     agent = ReactAgent(query=input)
     response = agent.prompt_agent()

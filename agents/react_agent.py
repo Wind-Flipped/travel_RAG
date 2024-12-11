@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 import importlib
 from typing import List, Dict, Any
 from pandas import DataFrame
-from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh
+from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
 import sys
 import json
 import time
@@ -31,23 +31,14 @@ pd.options.display.max_info_columns = 200
 
 os.environ['TIKTOKEN_CACHE_DIR'] = './tmp'
 
-actionMapping = {'restaurant_info':'restaurant_info', 'attraction_info':'attraction_info',
-                 'restaurant_distance':'attraction_distance', 'attraction_distance':'attraction_distance',
-                 'notebook':'notebook','planner':'planner'}
-
-
-class CityError(Exception):
-    pass
-
-
-class DateError(Exception):
-    pass
-
+actionMapping = {'RestaurantInfo':'restaurant_info', 'AttractionInfo':'attraction_info',
+                 'RestaurantDistance':'attraction_distance', 'AttractionDistance':'attraction_distance',
+                 'Notebook':'notebook','Planner':'planner'}
 
 class ReactAgent:
     def __init__(self,
                  args,
-                 mode: str = 'zero_shot',
+                 mode: str = 'zero_shot_reformat_zh',
                  tools: List[str] = None,
                  max_steps: int = 10,
                  max_retries: int = 3,
@@ -62,6 +53,7 @@ class ReactAgent:
         self.max_steps = max_steps
         self.mode = mode
 
+        self.vector_database = VectorDatabase()
         self.react_name = react_llm_name
         self.planner_name = planner_llm_name
 
@@ -69,6 +61,8 @@ class ReactAgent:
             self.agent_prompt = zeroshot_react_agent_prompt
         elif self.mode == 'zero_shot_zh':
             self.agent_prompt = zeroshot_react_agent_prompt_zh
+        elif self.mode == 'zero_shot_reformat_zh':
+            self.agent_prompt = zeroshot_react_agent_prompt_reformat_zh
 
         self.json_log = []
 
@@ -109,6 +103,8 @@ class ReactAgent:
 
         if reset:
             self.__reset_agent()
+
+        self.route_info, self.poi_info = self.vector_database.get_related_route_info(self.query)
 
         while not self.is_halted() and not self.is_finished():
             self.step()
@@ -196,12 +192,12 @@ class ReactAgent:
                         self.finished = True
                         return
 
-            if action_type == 'restaurant_info':
+            if action_type == 'RestaurantInfo':
                 try:
                     if True:
                         self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
                                                                   'Masked due to limited length. Make sure the data has been written in Notebook.')
-                        self.current_data = self.tools[action_type].run(action_arg)
+                        self.current_data = self.tools[pending_action].run(action_arg)
                         self.current_observation = str(to_string(self.current_data))
                         self.scratchpad += self.current_observation
                         self.__reset_record()
@@ -220,13 +216,13 @@ class ReactAgent:
                     self.scratchpad += f'Illegal Flight Search. Please try again.'
                     self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-            elif action_type == 'restaurant_distance':
+            elif action_type == 'RestaurantDistance':
 
                 try:
                     if True:
                         self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip().strip(),
                                                                   'Masked due to limited length. Make sure the data has been written in Notebook.')
-                        self.current_data = self.tools[action_type].run_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
+                        self.current_data = self.tools[pending_action].run_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
                         self.scratchpad += self.current_observation
                         self.__reset_record()
@@ -243,13 +239,13 @@ class ReactAgent:
                     self.scratchpad += f'Illegal Attraction Search. Please try again.'
                     self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-            elif action_type == 'attraction_info':
+            elif action_type == 'AttractionInfo':
 
                 try:
                     if True:
                         self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip().strip(),
                                                                   'Masked due to limited length. Make sure the data has been written in Notebook.')
-                        self.current_data = self.tools[action_type].run(action_arg)
+                        self.current_data = self.tools[pending_action].run(action_arg)
                         self.current_observation = to_string(self.current_data).strip()
                         self.scratchpad += self.current_observation
                         self.__reset_record()
@@ -268,11 +264,11 @@ class ReactAgent:
                     self.scratchpad += f'Illegal Restaurant Search. Please try again.'
                     self.json_log = f'Illegal args. Other Error'
 
-            elif action_type == 'attraction_distance':
+            elif action_type == 'AttractionDistance':
                 try:
                     self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
                                                               'Masked due to limited length. Make sure the data has been written in Notebook.')
-                    self.current_data = self.tools[action_type].run(action_arg)
+                    self.current_data = self.tools[pending_action].run(action_arg)
                     self.current_observation = to_string(self.tools[action_type].run(action_arg.split(', ')[0], action_arg.split(', ')[1])).strip()
                     self.scratchpad += self.current_observation
                     self.__reset_record()
@@ -291,11 +287,11 @@ class ReactAgent:
                     self.scratchpad += f'Illegal City Search. Please try again.'
                     self.json_log = f'Illegal args. Other Error'
 
-            elif action_type == 'notebook':
+            elif action_type == 'Notebook':
                 try:
                     self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
                                                               'Masked due to limited length. Make sure the data has been written in Notebook.')
-                    self.current_observation = str(self.tools[action_type].write(self.current_data, action_arg))
+                    self.current_observation = str(self.tools[pending_action].write(self.current_data, action_arg))
                     self.scratchpad += self.current_observation
                     self.__reset_record()
                     self.json_log[-1]['state'] = f'Successful'
@@ -349,12 +345,12 @@ class ReactAgent:
             try:
                 # print(self._build_agent_prompt())
                 if 'glm-4' in self.react_name:
-                    print("Begin to generate----------")
+                    # print("Begin to generate----------")
                     request = format_step(self.llm(self._build_agent_prompt()))
-                    print("------------scratchpad-----------")
-                    print(self.scratchpad)
-                    print("------------request--------------")
-                    print(request)
+                    # print("------------scratchpad-----------")
+                    # print(self.scratchpad)
+                    # print("------------request--------------")
+                    # print(request)
                 elif self.react_name == 'gemini':
                     request = format_step(self.llm.invoke(self._build_agent_prompt(), stop=['\n']).content)
                 else:
@@ -368,9 +364,15 @@ class ReactAgent:
                 return "Error !"
 
     def _build_agent_prompt(self) -> str:
-        return self.agent_prompt.format(
-            query=self.query,
-            scratchpad=self.scratchpad)
+        if self.mode == 'zero_shot':
+            return self.agent_prompt.format(
+                query=self.query,
+                scratchpad=self.scratchpad)
+        elif self.mode == 'zero_shot_reformat_zh':
+            return self.agent_prompt.format(
+                query=self.query,
+                route_info=self.route_info,
+                scratchpad=self.scratchpad)
 
     def is_finished(self) -> bool:
         return self.finished
@@ -388,6 +390,8 @@ class ReactAgent:
         self.current_observation = ''
         self.current_data = None
         self.last_actions = []
+        self.route_info = ''
+        self.poi_info = ''
 
         if 'notebook' in self.tools:
             self.tools['notebook'].reset()
@@ -423,6 +427,7 @@ class ReactAgent:
 
 def parse_action(string):
     pattern = r'^(\w+)\[(.+)\]$'
+    pattern = r'^([^\[]+)\[([^\]]+)\]'
     match = re.match(pattern, string)
 
     try:
@@ -514,7 +519,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="glm-4-plus")
     parser.add_argument("--output_dir", type=str, default="./logs")
     args = parser.parse_args()
-    agent = ReactAgent(None, mode="zero_shot_zh", tools=tools_list, max_steps=10, react_llm_name=args.model_name,
+    agent = ReactAgent(None, mode='zero_shot_reformat_zh', tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
     number = 1
     query = "请帮我推荐一个杭州的一日游，预算在200元以内，不要去人流量多的地方，想要去西湖。"
@@ -544,4 +549,4 @@ if __name__ == '__main__':
 
     # write to json file
     with open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json'), 'w') as f:
-        json.dump(result, f, indent=4)
+        json.dump(result, f, indent=4, ensure_ascii=False)

@@ -2,26 +2,26 @@ from langchain.prompts import PromptTemplate
 
 
 ZEROSHOT_REACT_INSTRUCTION = """Collect information for a query plan using interleaving 'Thought', 'Action', and 'Observation' steps. Ensure you gather valid information related to dining and attractions. All information should be written in Notebook, which will then be input into the Planner tool. Note that the nested use of tools is prohibited. 'Thought' can reason about the current situation, and 'Action' can have 6 different types:
-(1) restaurant_info[Restaurant name]:
+(1) RestaurantInfo[Restaurant name]:
 Description: A restaurant information retrieval tool.
 Parameters:
 Restaurant name: The name of the restaurant you would like to know more about.
 Example: restaurant_info[KFC] would get the information of KFC, including latitude and longitude, cuisines, etc.
 
-(2) restaurant_distance[restaurant_1, restaurant_2]:
+(2) RestaurantDistance[restaurant_1, restaurant_2]:
 Description: Estimate the distance from two restaurants.
 Parameters:
 restaurant_1: The name of first restaurant.
 restaurant_2: The name of second restaurant.
 Example: restaurant_distance[Xiba tofu, Rest Hotpot] would provide distance between restaurant Xiba tofu and restaurant Rest Hotpot.
 
-(3) attraction_info[attraction name]:
+(3) AttractionInfo[attraction name]:
 Description: An attraction information retrieval tool.
 Parameters:
 attraction name: The name of the attraction you would like to know more about.
 Example: attraction_info[Forbidden City] would get the information of Forbidden City, including latitude and longitude.
 
-(4) attraction_distance[attraction_1, attraction_2]:
+(4) AttractionDistance[attraction_1, attraction_2]:
 Description: Estimate the distance from two restaurants.
 Parameters:
 attraction_1: The name of first attraction.
@@ -46,25 +46,46 @@ Query: {query}{scratchpad}"""
 
 ZEROSHOT_REACT_INSTRUCTION_ZH = '''使用交替进行的“思考”、“行动”和“观察”步骤收集查询计划所需的信息。确保收集与餐饮和景点相关的有效信息。所有信息应写入笔记本，然后输入到规划工具中。请注意，不允许嵌套使用工具。“思考”可以推理当前的情况，“行动”可以有六种不同类型：
 
-(1) restaurant_info[餐厅名称]： 描述：一个餐厅信息检索工具。 参数： 餐厅名称：您想了解更多的餐厅名称。 示例：restaurant_info[KFC] 会获取KFC的相关信息，包括经纬度、菜系等。
+(1) RestaurantInfo[餐厅名称]： 描述：一个餐厅信息检索工具。 参数： 餐厅名称：您想了解更多的餐厅名称。 示例：RestaurantInfo[KFC] 会获取KFC的相关信息，包括经纬度、菜系等。
 
-(2) restaurant_distance[餐厅1, 餐厅2]： 描述：估算两家餐厅之间的距离。 参数： 餐厅1：第一家餐厅的名称。 餐厅2：第二家餐厅的名称。 示例：restaurant_distance[Xiba tofu, Rest Hotpot] 会提供餐厅 Xiba tofu 和餐厅 Rest Hotpot 之间的距离。
+(2) RestaurantDistance[餐厅1, 餐厅2]： 描述：估算两家餐厅之间的距离。 参数： 餐厅1：第一家餐厅的名称。 餐厅2：第二家餐厅的名称。 示例：RestaurantDistance[Xiba tofu, Rest Hotpot] 会提供餐厅 Xiba tofu 和餐厅 Rest Hotpot 之间的距离。
 
-(3) attraction_info[景点名称]： 描述：一个景点信息检索工具。 参数： 景点名称：您想了解更多的景点名称。 示例：attraction_info[Forbidden City] 会获取Forbidden City的相关信息，包括经纬度。
+(3) AttractionInfo[景点名称]： 描述：一个景点信息检索工具。 参数： 景点名称：您想了解更多的景点名称。 示例：AttractionInfo[Forbidden City] 会获取Forbidden City的相关信息，包括经纬度。
 
-(4) attraction_distance[景点1, 景点2]： 描述：估算两个景点之间的距离。 参数： 景点1：第一个景点的名称。 景点2：第二个景点的名称。 示例：attraction_distance[Summer Palace, Forbidden City] 会提供景点 Forbidden City 和景点 Summer Palace 之间的距离。
+(4) AttractionDistance[景点1, 景点2]： 描述：估算两个景点之间的距离。 参数： 景点1：第一个景点的名称。 景点2：第二个景点的名称。 示例：AttractionDistance[Summer Palace, Forbidden City] 会提供景点 Forbidden City 和景点 Summer Palace 之间的距离。
 
-(5) NotebookWrite[简短描述]： 描述：将新的数据条目写入笔记本工具，附上简短描述。此工具应在FlightSearch、AccommodationSearch、AttractionSearch、RestaurantSearch 或 GoogleDistanceMatrix 后立即使用。只有存储在笔记本中的数据可以被规划工具看到。因此，您应将所有需要的信息写入笔记本。 参数：简短描述 - 存储数据的简短描述或标签。您无需在描述中写出所有信息，您搜索的数据会自动存储在笔记本中。 示例：NotebookWrite[Forbidden City的景点信息] 会将Forbidden City的景点信息存储在笔记本中。
+(5) Notebook[简短描述]： 描述：将新的数据条目写入笔记本工具，附上简短描述。此工具应在RestaurantInfo、RestaurantDistance、AttractionInfo 或 AttractionDistance 后立即使用。只有存储在笔记本中的数据可以被规划工具看到。因此，您应将所有需要的信息写入笔记本。 参数：简短描述 - 存储数据的简短描述或标签。您无需在描述中写出所有信息，您搜索的数据会自动存储在笔记本中。 示例：NotebookWrite[Forbidden City的景点信息] 会将Forbidden City的景点信息存储在笔记本中。
+
+(6) Planner[查询]： 描述：一个智能规划工具，根据用户输入和存储在笔记本中的信息制定详细的计划。 参数： 查询：用户的查询。 示例：Planner[给我一个在杭州的1日游计划] 会返回一个详细的杭州1日游计划。 您应该尽可能多地使用步骤来收集足够的信息并输入到规划工具中。
+
+每个行动仅调用一次某个功能。请不要在行动中添加任何描述。
+
+查询：{query}{scratchpad}
+
+'''
+
+ZEROSHOT_REACT_INSTRUCTION_REFORMAT_ZH = '''使用交替进行的“思考”、“行动”和“观察”步骤收集查询计划所需的信息。确保收集与餐饮和景点相关的有效信息。所有信息应写入笔记本，然后输入到规划工具中。请注意，不允许嵌套使用工具。“思考”可以推理当前的情况，“行动”可以有六种不同类型：
+
+(1) RestaurantInfo[餐厅名称]： 描述：一个餐厅信息检索工具。 参数： 餐厅名称：您想了解更多的餐厅名称。 示例：RestaurantInfo[KFC] 会获取KFC的相关信息，包括经纬度、菜系等。
+
+(2) RestaurantDistance[餐厅1, 餐厅2]： 描述：估算两家餐厅之间的距离。 参数： 餐厅1：第一家餐厅的名称。 餐厅2：第二家餐厅的名称。 示例：RestaurantDistance[Xiba tofu, Rest Hotpot] 会提供餐厅 Xiba tofu 和餐厅 Rest Hotpot 之间的距离。
+
+(3) AttractionInfo[景点名称]： 描述：一个景点信息检索工具。 参数： 景点名称：您想了解更多的景点名称。 示例：AttractionInfo[Forbidden City] 会获取Forbidden City的相关信息，包括经纬度。
+
+(4) AttractionDistance[景点1, 景点2]： 描述：估算两个景点之间的距离。 参数： 景点1：第一个景点的名称。 景点2：第二个景点的名称。 示例：AttractionDistance[Summer Palace, Forbidden City] 会提供景点 Forbidden City 和景点 Summer Palace 之间的距离。
+
+(5) Notebook[简短描述]： 描述：将新的数据条目写入笔记本工具，附上简短描述。此工具应在RestaurantInfo、RestaurantDistance、AttractionInfo 或 AttractionDistance 后立即使用。只有存储在笔记本中的数据可以被规划工具看到。因此，您应将所有需要的信息写入笔记本。 参数：简短描述 - 存储数据的简短描述或标签。您无需在描述中写出所有信息，您搜索的数据会自动存储在笔记本中。 示例：NotebookWrite[Forbidden City的景点信息] 会将Forbidden City的景点信息存储在笔记本中。
 
 (6) Planner[查询]： 描述：一个智能规划工具，根据用户输入和存储在笔记本中的信息制定详细的计划。 参数： 查询：用户的查询。 示例：Planner[给我一个在杭州的1日游计划] 会返回一个详细的杭州1日游计划。 您应该尽可能多地使用步骤来收集足够的信息并输入到规划工具中。
 
 每个行动仅调用一次某个功能。请不要在行动中添加任何描述。
 
 查询：{query}
-可参考的已有相关路线：
+可参考的已有相关路线：{route_info}
 {scratchpad}
 
 '''
+
 
 zeroshot_react_agent_prompt = PromptTemplate(
                         input_variables=["query", "scratchpad"],
@@ -73,6 +94,10 @@ zeroshot_react_agent_prompt = PromptTemplate(
 zeroshot_react_agent_prompt_zh = PromptTemplate(
                         input_variables=["query", "scratchpad"],
                         template=ZEROSHOT_REACT_INSTRUCTION_ZH,
+                        )
+zeroshot_react_agent_prompt_reformat_zh = PromptTemplate(
+                        input_variables=["query", "route_info", "scratchpad"],
+                        template=ZEROSHOT_REACT_INSTRUCTION_REFORMAT_ZH,
                         )
 
 PLANNER_INSTRUCTION = """You are a proficient planner. Based on the provided information and query, please give me a detailed plan, including specifics such as restaurant names and accommodation names. Note that all the information in your plan should be derived from the provided data. You must adhere to the format given in the example. Additionally, all details should align with commonsense. The symbol '-' indicates that information is unnecessary.
