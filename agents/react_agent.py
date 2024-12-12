@@ -33,6 +33,7 @@ os.environ['TIKTOKEN_CACHE_DIR'] = './tmp'
 
 actionMapping = {'RestaurantInfo':'restaurant_info', 'AttractionInfo':'attraction_info',
                  'RestaurantDistance':'restaurant_distance', 'AttractionDistance':'attraction_distance',
+                 'RestaurantSearch': 'restaurant_search', 'AttractionSearch':'attraction_search',
                  'Notebook':'notebook','Planner':'planner'}
 
 class ReactAgent:
@@ -222,7 +223,7 @@ class ReactAgent:
                         print(e)
                         self.retry_record[pending_action] += 1
                         self.current_observation = f'Illegal Restaurant info Search. Please try again.'
-                        self.scratchpad += f'Illegal Flight Search. Please try again.'
+                        self.scratchpad += f'Illegal Restaurant info Search. Please try again.'
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
                 elif action_type == 'RestaurantDistance':
@@ -237,9 +238,44 @@ class ReactAgent:
                     except Exception as e:
                         print(e)
                         self.retry_record[pending_action] += 1
+                        self.current_observation = f'Illegal Attraction Distance Search. Please try again.'
+                        self.scratchpad += f'Illegal Attraction Distance Search. Please try again.'
+                        self.json_log[-1]['state'] = f'Illegal args. Other Error'
+
+                elif action_type == 'RestaurantSearch':
+                    self.action_info = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家餐厅的信息"
+                    try:
+                        self.current_data = self.tools[pending_action].get_nearest_restaurants(
+                            float(action_arg.split(', ')[0]), float(action_arg.split(', ')[1]), int(action_arg.split(', ')[2]))
+                        self.current_observation = to_string(self.current_data).strip('\n').strip()
+                        self.scratchpad += self.current_observation
+                        self.__reset_record()
+                        self.json_log[-1]['state'] = f'Successful'
+
+                    except Exception as e:
+                        print(e)
+                        self.retry_record[pending_action] += 1
+                        self.current_observation = f'Illegal Restaurant Search. Please try again.'
+                        self.scratchpad += f'Illegal Restaurant Search. Please try again.'
+                        self.json_log[-1]['state'] = f'Illegal args. Other Error'
+
+                elif action_type == 'AttractionSearch':
+                    self.action_info = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家景点的信息"
+                    try:
+                        self.current_data = self.tools[pending_action].get_nearest_restaurants(
+                            float(action_arg.split(', ')[0]), float(action_arg.split(', ')[1]), int(action_arg.split(', ')[2]))
+                        self.current_observation = to_string(self.current_data).strip('\n').strip()
+                        self.scratchpad += self.current_observation
+                        self.__reset_record()
+                        self.json_log[-1]['state'] = f'Successful'
+
+                    except Exception as e:
+                        print(e)
+                        self.retry_record[pending_action] += 1
                         self.current_observation = f'Illegal Attraction Search. Please try again.'
                         self.scratchpad += f'Illegal Attraction Search. Please try again.'
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
+
 
                 elif action_type == 'AttractionInfo':
                     self.action_info = f"景点{action_arg}的信息"
@@ -253,8 +289,8 @@ class ReactAgent:
                     except Exception as e:
                         print(e)
                         self.retry_record[pending_action] += 1
-                        self.current_observation = f'Illegal Restaurant Search. Please try again.'
-                        self.scratchpad += f'Illegal Restaurant Search. Please try again.'
+                        self.current_observation = f'Illegal Attraction info Search. Please try again.'
+                        self.scratchpad += f'Illegal Attraction info Search. Please try again.'
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
                 elif action_type == 'AttractionDistance':
@@ -269,8 +305,8 @@ class ReactAgent:
                     except Exception as e:
                         print(e)
                         self.retry_record[pending_action] += 1
-                        self.current_observation = f'Illegal City Search. Please try again.'
-                        self.scratchpad += f'Illegal City Search. Please try again.'
+                        self.current_observation = f'Illegal Attraction Distance Search. Please try again.'
+                        self.scratchpad += f'Illegal Attraction Distance Search. Please try again.'
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
                 try:
@@ -380,9 +416,9 @@ class ReactAgent:
     def load_tools(self, tools: List[str]) -> Dict[str, Any]:
         tools_map = {}
         for tool_name in tools:
-            if tool_name == 'restaurant_info' or tool_name == 'restaurant_distance':
+            if tool_name == 'restaurant_info' or tool_name == 'restaurant_distance' or tool_name == 'restaurant_search':
                 tools_map[tool_name] = apis.Restaurants()
-            elif tool_name == 'attraction_info' or tool_name == 'attraction_distance':
+            elif tool_name == 'attraction_info' or tool_name == 'attraction_distance' or tool_name == 'attraction_search':
                 tools_map[tool_name] = apis.Attractions()
             elif tool_name == 'notebook':
                 tools_map[tool_name] = Notebook()
@@ -489,7 +525,8 @@ def to_string(data) -> str:
 
 if __name__ == '__main__':
 
-    tools_list = ['restaurant_info', 'attraction_info', 'restaurant_distance', 'attraction_distance', 'notebook', 'planner']
+    tools_list = ['restaurant_info', 'attraction_info', 'restaurant_distance', 'attraction_distance',
+                  'restaurant_search', 'attraction_search', 'notebook', 'planner']
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")

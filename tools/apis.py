@@ -27,6 +27,14 @@ class Tools:
             return results
         return results.iloc[0].dropna().to_dict()
 
+    # Get nearest k POIs
+    def get_nearest_restaurants(self, latitude: float, longitude: float, k: int = 3):
+        df = self.data
+        df['distance'] = df.apply(lambda row: calculate_distance((latitude, longitude), (row['latitude'], row['longitude'])), axis=1)
+        nearest_pois = df.nsmallest(k, 'distance')
+
+        return nearest_pois
+
     def run_for_distance(self,
                          name1: str, name2: str
                          ) -> float:
@@ -102,3 +110,4 @@ if __name__ == '__main__':
 
     print(attractions.run("西湖"))
     print(attractions.run_for_distance("西湖", "风景区"))
+    print(attractions.get_nearest_restaurants(30.26090127, 120.1470172, 10))
