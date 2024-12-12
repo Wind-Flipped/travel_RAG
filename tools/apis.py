@@ -89,7 +89,7 @@ class Restaurants(Tools):
 
     def run_for_distance(self,
             restaurant_name1: str, restaurant_name2: str
-            ) -> DataFrame:
+            ) -> float:
         """Search for restaurant ."""
         return super().run_for_distance(restaurant_name1, restaurant_name2)
 

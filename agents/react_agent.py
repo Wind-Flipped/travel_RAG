@@ -32,7 +32,7 @@ pd.options.display.max_info_columns = 200
 os.environ['TIKTOKEN_CACHE_DIR'] = './tmp'
 
 actionMapping = {'RestaurantInfo':'restaurant_info', 'AttractionInfo':'attraction_info',
-                 'RestaurantDistance':'attraction_distance', 'AttractionDistance':'attraction_distance',
+                 'RestaurantDistance':'restaurant_distance', 'AttractionDistance':'attraction_distance',
                  'Notebook':'notebook','Planner':'planner'}
 
 class ReactAgent:
@@ -53,9 +53,11 @@ class ReactAgent:
         self.max_steps = max_steps
         self.mode = mode
 
-        self.vector_database = VectorDatabase()
-        self.react_name = react_llm_name
-        self.planner_name = planner_llm_name
+        if 'glm-4' in react_llm_name:
+            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+        else:
+            print("LLM's name is getting wrong")
+            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
         if self.mode == 'zero_shot':
             self.agent_prompt = zeroshot_react_agent_prompt
@@ -64,17 +66,14 @@ class ReactAgent:
         elif self.mode == 'zero_shot_reformat_zh':
             self.agent_prompt = zeroshot_react_agent_prompt_reformat_zh
 
+        self.vector_database = VectorDatabase(model=self.llm.get_model())
+        self.react_name = react_llm_name
+        self.planner_name = planner_llm_name
+
         self.json_log = []
 
         self.current_observation = ''
         self.current_data = None
-
-        if 'glm-4' in react_llm_name:
-            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
-        else:
-            print("LLM's name is getting wrong")
-            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
-
         self.illegal_early_stop_patience = illegal_early_stop_patience
 
         self.tools = self.load_tools(tools)
@@ -85,6 +84,7 @@ class ReactAgent:
         # print(self.retry_record)
 
         self.last_actions = []
+        self.action_info = ''
 
         # self.log_path = logs_path + datetime.now().strftime('%Y%m%d%H%M%S') + '.out'
         # self.log_file = open(self.log_path, 'a+')
@@ -116,25 +116,42 @@ class ReactAgent:
         self.json_log.append({"step": self.step_n, "thought": "",
                               "action": "", "observation": "", "state": ""})
 
-        self.scratchpad += f'\nThought {self.step_n}:'
-        self.scratchpad += ' ' + self.prompt_agent()
+        # self.scratchpad += f'\nThought {self.step_n}:'
+        generate_text = self.prompt_agent()
+        try:
+            thought = re.search(r'Thought \d+: ([^A。.]+)', generate_text).group(1)
+            action = re.search(r"Action \d+: (.*?\[.*?\])", generate_text).group(1)
+        except:
+            self.retry_record['invalidAction'] += 1
+            print(f'Invalid Thought or Action: {generate_text}')
+            self.current_observation = 'Invalid Action.'
+            self.scratchpad += self.current_observation
+            self.json_log[-1]['state'] = f'invalidAction'
+            self.step_n += 1
+            return
+        self.scratchpad += f'\nThought {self.step_n}: {thought}. Action {self.step_n}: {action}'
+
+        print(f"===============scratchpad {self.step_n}===================")
+        print(self.scratchpad)
+        print(f"===============scratchpad {self.step_n}===================")
 
 
         print(self.scratchpad.split('\n')[-1])
-        self.json_log[-1]['thought'] = self.scratchpad.split('\n')[-1].replace(f'\nThought {self.step_n}:', "")
+        # self.json_log[-1]['thought'] = self.scratchpad.split('\n')[-1].replace(f'Thought {self.step_n}:', "")
+        self.json_log[-1]['thought'] = thought
         # self.log_file.write(self.scratchpad.split('\n')[-1] + '\n')
 
         # Act
-        self.scratchpad += f'\nAction {self.step_n}:'
-        action = self.prompt_agent()
+        # self.scratchpad += f'Action {self.step_n}:'
+        # action = self.prompt_agent()
         print(self.step_n)
         print("--------------action------------------")
         print(action)
 
         if action == None or action == '' or action == '\n':
             self.scratchpad += " Your action is filtered due to content. Please make sure your action does not start with ['\\n', 'Thought', 'Action', 'Observation'] and assume all the actions are permitted in this environment and take the action again."
-        else:
-            self.scratchpad += ' ' + action
+        # else:
+        #     self.scratchpad += ' ' + action
 
         if len(self.last_actions) > 0 and self.last_actions[-1] != action:
             self.last_actions.clear()
@@ -142,8 +159,8 @@ class ReactAgent:
         # refresh last_action list
         self.last_actions.append(action)
 
-        self.json_log[-1]['action'] = self.scratchpad.split('\n')[-1].replace(f'\nAction {self.step_n}:', "")
-
+        # self.json_log[-1]['action'] = self.scratchpad.split('\n')[-1].replace(f'\nAction {self.step_n}:', "")
+        self.json_log[-1]['action'] = action
         # examine if the same action has been repeated 3 times consecutively
         if len(self.last_actions) == 3:
             print("The same action has been repeated 3 times consecutively. So we stop here.")
@@ -178,8 +195,7 @@ class ReactAgent:
                         action_type = 'Planner'
                         print(f"{pending_action} early stop due to {self.max_retries} max retries.")
                         # self.log_file.write(f"{pending_action} early stop due to {self.max_retries} max retries.")
-                        self.json_log[-1][
-                            'state'] = f"{pending_action} early stop due to {self.max_retries} max retries."
+                        self.json_log[-1]['state'] = f"{pending_action} early stop due to {self.max_retries} max retries."
                         self.finished = True
                         return
 
@@ -192,123 +208,84 @@ class ReactAgent:
                         self.finished = True
                         return
 
-            if action_type == 'RestaurantInfo':
-                try:
-                    if True:
-                        self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
-                                                                  'Masked due to limited length. Make sure the data has been written in Notebook.')
+                if action_type == 'RestaurantInfo':
+                    self.action_info = f"餐厅{action_arg}的信息"
+                    try:
+
                         self.current_data = self.tools[pending_action].run(action_arg)
                         self.current_observation = str(to_string(self.current_data))
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
-                except ValueError as e:
-                    self.retry_record['restaurant_info'] += 1
-                    self.current_observation = str(e)
-                    self.scratchpad += str(e)
-                    self.json_log[-1]['state'] = f'Illegal args. City Error'
+                    except Exception as e:
+                        print(e)
+                        self.retry_record[pending_action] += 1
+                        self.current_observation = f'Illegal Restaurant info Search. Please try again.'
+                        self.scratchpad += f'Illegal Flight Search. Please try again.'
+                        self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-                except Exception as e:
-                    print(e)
-                    self.retry_record['restaurant_info'] += 1
-                    self.current_observation = f'Illegal Restaurant info Search. Please try again.'
-                    self.scratchpad += f'Illegal Flight Search. Please try again.'
-                    self.json_log[-1]['state'] = f'Illegal args. Other Error'
-
-            elif action_type == 'RestaurantDistance':
-
-                try:
-                    if True:
-                        self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip().strip(),
-                                                                  'Masked due to limited length. Make sure the data has been written in Notebook.')
-                        self.current_data = self.tools[pending_action].run_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
+                elif action_type == 'RestaurantDistance':
+                    self.action_info = f"餐厅{action_arg.split(', ')[0]}到餐厅{action_arg.split(', ')[1]}的距离（千米）"
+                    try:
+                        self.current_data = self.tools[pending_action].run_for_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
-                except ValueError as e:
-                    self.retry_record[action_type] += 1
-                    self.current_observation = str(e)
-                    self.scratchpad += str(e)
-                    self.json_log[-1]['state'] = f'Illegal args. City Error'
-                except Exception as e:
-                    print(e)
-                    self.retry_record[action_type] += 1
-                    self.current_observation = f'Illegal Attraction Search. Please try again.'
-                    self.scratchpad += f'Illegal Attraction Search. Please try again.'
-                    self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-            elif action_type == 'AttractionInfo':
+                    except Exception as e:
+                        print(e)
+                        self.retry_record[pending_action] += 1
+                        self.current_observation = f'Illegal Attraction Search. Please try again.'
+                        self.scratchpad += f'Illegal Attraction Search. Please try again.'
+                        self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-                try:
-                    if True:
-                        self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip().strip(),
-                                                                  'Masked due to limited length. Make sure the data has been written in Notebook.')
+                elif action_type == 'AttractionInfo':
+                    self.action_info = f"景点{action_arg}的信息"
+                    try:
                         self.current_data = self.tools[pending_action].run(action_arg)
                         self.current_observation = to_string(self.current_data).strip()
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
-                except ValueError as e:
-                    self.retry_record[action_type] += 1
-                    self.current_observation = str(e)
-                    self.scratchpad += str(e)
-                    self.json_log[-1]['state'] = f'Illegal args. City Error'
+                    except Exception as e:
+                        print(e)
+                        self.retry_record[pending_action] += 1
+                        self.current_observation = f'Illegal Restaurant Search. Please try again.'
+                        self.scratchpad += f'Illegal Restaurant Search. Please try again.'
+                        self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-                except Exception as e:
-                    print(e)
-                    self.retry_record[action_type] += 1
-                    self.current_observation = f'Illegal Restaurant Search. Please try again.'
-                    self.scratchpad += f'Illegal Restaurant Search. Please try again.'
-                    self.json_log = f'Illegal args. Other Error'
+                elif action_type == 'AttractionDistance':
+                    self.action_info = f"景点{action_arg.split(', ')[0]}到景点{action_arg.split(', ')[1]}的距离（千米）"
+                    try:
+                        self.current_data = self.tools[pending_action].run_for_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
+                        self.current_observation = to_string(self.current_data).strip()
+                        self.scratchpad += self.current_observation
+                        self.__reset_record()
+                        self.json_log[-1]['state'] = f'Successful'
 
-            elif action_type == 'AttractionDistance':
+                    except Exception as e:
+                        print(e)
+                        self.retry_record[pending_action] += 1
+                        self.current_observation = f'Illegal City Search. Please try again.'
+                        self.scratchpad += f'Illegal City Search. Please try again.'
+                        self.json_log[-1]['state'] = f'Illegal args. Other Error'
+
                 try:
-                    self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
-                                                              'Masked due to limited length. Make sure the data has been written in Notebook.')
-                    self.current_data = self.tools[pending_action].run(action_arg)
-                    self.current_observation = to_string(self.tools[action_type].run(action_arg.split(', ')[0], action_arg.split(', ')[1])).strip()
-                    self.scratchpad += self.current_observation
+                    # store observation to notebook
+                    self.tools['notebook'].write(self.current_data, self.action_info)
                     self.__reset_record()
-                    self.json_log[-1]['state'] = f'Successful'
-
-                except ValueError as e:
-                    self.retry_record[action_type] += 1
-                    self.current_observation = str(e)
-                    self.scratchpad += str(e)
-                    self.json_log[-1]['state'] = f'Illegal args. State Error'
 
                 except Exception as e:
                     print(e)
-                    self.retry_record[action_type] += 1
-                    self.current_observation = f'Illegal City Search. Please try again.'
-                    self.scratchpad += f'Illegal City Search. Please try again.'
-                    self.json_log = f'Illegal args. Other Error'
 
-            elif action_type == 'Notebook':
-                try:
-                    self.scratchpad = self.scratchpad.replace(to_string(self.current_data).strip(),
-                                                              'Masked due to limited length. Make sure the data has been written in Notebook.')
-                    self.current_observation = str(self.tools[pending_action].write(self.current_data, action_arg))
-                    self.scratchpad += self.current_observation
-                    self.__reset_record()
-                    self.json_log[-1]['state'] = f'Successful'
-
-                except Exception as e:
-                    print(e)
-                    self.retry_record[action_type] += 1
-                    self.current_observation = f'{e}'
-                    self.scratchpad += f'{e}'
-                    self.json_log[-1]['state'] = f'Illegal args. Other Error'
-
-
-            elif action_type == "planner":
+            elif action_type == "Planner":
                 # try:
 
                 self.current_observation = str(
-                    self.tools[action_type].run(str(self.tools['notebook'].list_all()), action_arg))
+                    self.tools["planner"].run(str(self.tools['notebook'].list_all()), action_arg))
                 self.scratchpad += self.current_observation
                 self.answer = self.current_observation
                 self.__reset_record()
@@ -332,7 +309,6 @@ class ReactAgent:
 
         self.step_n += 1
 
-        #
 
         if action_type and action_type == 'Planner' and self.retry_record['planner'] == 0:
             self.finished = True
@@ -392,6 +368,7 @@ class ReactAgent:
         self.last_actions = []
         self.route_info = ''
         self.poi_info = ''
+        self.action_info = ''
 
         if 'notebook' in self.tools:
             self.tools['notebook'].reset()
@@ -522,7 +499,7 @@ if __name__ == '__main__':
     agent = ReactAgent(None, mode='zero_shot_reformat_zh', tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
     number = 1
-    query = "请帮我推荐一个杭州的一日游，预算在200元以内，不要去人流量多的地方，想要去西湖。"
+    query = "请帮我推荐一个杭州的一日游，预算在500元以内，一共有2个人，不要去人流量多的地方，想要去西湖。"
     # check if the directory exists
     if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}')):
         os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}'))

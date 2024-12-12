@@ -56,6 +56,9 @@ class LLMs:
         )
         return response.choices[0].message.content
 
+    def get_model(self):
+        return self.model
+
 
 def format_prompt_explain(question: str, info: str) -> str:
     # 这里利用输入的问题与向量数据库里的相似度来匹配最相关的信息，填充到输入的提示词中
@@ -86,7 +89,7 @@ def format_prompt(question: str, info: str) -> str:
     return template.format(question=question, info=format_info)
 
 class VectorDatabase:
-    def __init__(self,
+    def __init__(self, model = ZhipuAI(api_key="8cf93821658b7df312645b6dc443b871.aY8DFiq17G0NrVmx"),
                  rag_database: list[str] = ["/home/wangb/cyo/graduation/rag/databases/hangzhou",
                                             "/home/wangb/cyo/graduation/rag/databases/hangzhou_poi"]) -> None:
         # Load vector database and embedding model
@@ -96,16 +99,13 @@ class VectorDatabase:
         self.db_poi.load_vector(rag_database[1])
         self.embedding_model = Zhipuembedding()
         self.history = []
-        # self.divide_request = Request
+        self.request_split = Request(model=model)
 
     def get_related_route_info(self, query: str):
-        # TODO (Use Request to divide query into pos_question and neg_question)
-        pos_question, neg_question = self.function(query)
+        # Use Request to divide query into pos_question and neg_question)
+        pos_question, neg_question = self.request_split.extract_requests(query)
         routes, pois = self.query_databases(pos_question, neg_question)
         return self.query_zh(routes, pois)
-
-    def function(self,query : str):
-        return query, ""
 
     def query_route(self, pos_question, neg_question):
         info = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
