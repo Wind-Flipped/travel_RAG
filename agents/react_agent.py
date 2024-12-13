@@ -23,6 +23,7 @@ from llms import LLMs, VectorDatabase
 import tools.apis as apis
 from tools.notebook.apis import Notebook
 from tools.planner.apis import Planner
+from evaluate import Evaluator
 
 # OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 
@@ -535,32 +536,41 @@ if __name__ == '__main__':
     args = parser.parse_args()
     agent = ReactAgent(None, mode='zero_shot_reformat_zh', tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
-    number = 1
-    query = "请帮我推荐一个杭州的一日游，预算在500元以内，一共有2个人，不要去人流量多的地方，想要去西湖。"
-    # check if the directory exists
-    if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}')):
-        os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}'))
-    if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')):
-        result = [{}]
-    else:
-        result = json.load(
-            open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')))
 
-    while True:
+    number = 10
+    evaluator = Evaluator()
+    queries = evaluator.generate_request(number=number)
+    step = 1
+    for query in tqdm(queries):
+        if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}')):
+            os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}'))
+        if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')):
+            result = [{}]
+        else:
+            result = json.load(
+                open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')))
+
+
         planner_results, scratchpad, action_log = agent.run(query)
-        if planner_results != None:
-            break
 
-    if planner_results == 'Max Token Length Exceeded.':
-        result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-        result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
-        action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
-        result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-    else:
-        result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-        result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-        result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
 
-    # write to json file
-    with open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json'), 'w') as f:
-        json.dump(result, f, indent=4, ensure_ascii=False)
+        if planner_results == 'Max Token Length Exceeded.':
+            result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+            result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
+            action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
+            result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+        else:
+            result[-1][f'{args.model_name}_two-stage_query'] = query
+            result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+            result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+            result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+
+        # write to json file
+        with open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{step}.json'), 'w') as f:
+            json.dump(result, f, indent=4, ensure_ascii=False)
+
+        step += 1
+
+        evaluator.evaluate(agent_output=planner_results)
+
+    evaluator.print_result()

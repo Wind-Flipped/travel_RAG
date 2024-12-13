@@ -1,3 +1,5 @@
+import random
+
 import pandas as pd
 from pandas import DataFrame
 import os, sys
@@ -10,7 +12,6 @@ class Tools:
         self.path = path
         self.data = pd.read_csv(self.path)
 
-
     def load_db(self):
         self.data = pd.read_csv(self.path).dropna()
 
@@ -20,20 +21,22 @@ class Tools:
         """Search for attraction ."""
         results = self.data[self.data['shopname'] == name]
         if len(results) == 0:
-            results = self.data[self.data['shopname'].str.contains(name, case=False, na=False)]
-            if len(results) == 0:
-                return f"There is no {name} in this city."
-            results = results.sort_values(by=["star"], ascending=False).iloc[0].to_dict()
-            return results
+            return f"There is no {name} in this city."
         return results.iloc[0].dropna().to_dict()
 
     # Get nearest k POIs
-    def get_nearest_restaurants(self, latitude: float, longitude: float, k: int = 3):
+    def get_nearest_restaurants(self, longitude: float, latitude: float, k: int = 3):
         df = self.data
         df['distance'] = df.apply(lambda row: calculate_distance((latitude, longitude), (row['latitude'], row['longitude'])), axis=1)
         nearest_pois = df.nsmallest(k, 'distance')
 
         return nearest_pois
+
+    def get_one_shopname(self):
+        return self.data.iloc[random.randint(0,len(self.data) - 1)]["shopname"]
+
+    def get_one_type(self):
+        return self.data.iloc[random.randint(0,len(self.data) - 1)]["type"]
 
     def run_for_distance(self,
                          name1: str, name2: str
@@ -84,7 +87,7 @@ class Attractions(Tools):
         return super().run_for_distance(attraction_name1, attraction_name2)
 
 class Restaurants(Tools):
-    def __init__(self, path="database/restaurant.csv"):
+    def __init__(self, path="database/new_restaurant.csv"):
         super().__init__(path)
         print("Restaurants loaded.")
 
@@ -111,3 +114,4 @@ if __name__ == '__main__':
     print(attractions.run("西湖"))
     print(attractions.run_for_distance("西湖", "风景区"))
     print(attractions.get_nearest_restaurants(30.26090127, 120.1470172, 10))
+    print(attractions.get_one_shopname())
