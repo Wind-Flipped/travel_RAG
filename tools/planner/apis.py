@@ -24,7 +24,7 @@ class ReflexionStrategy(Enum):
 class Planner:
     def __init__(self,
                  # args,
-                 model_name: str = 'glm-4-plus',
+                 model_name: str = 'glm-4-air',
                  agent_prompt = planner_agent_prompt_zh,
                  ) -> None:
 
@@ -34,10 +34,10 @@ class Planner:
 
 
         if 'glm-4' in model_name:
-            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+            self.llm = LLMs(model_name=self.model_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
             print("LLM's name is getting wrong")
-            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+            self.llm = LLMs(model_name=self.model_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
         print(f"PlannerAgent {model_name} loaded.")
 

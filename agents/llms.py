@@ -12,8 +12,8 @@ from rag.component.databases import Vectordatabase
 from rag.component.request import Request
 
 class LLMs:
-    def __init__(self, model_name: str = 'glm-4-0520', temperature: float = 0.9,
-                 rag_database: str = "/home/wangb/cyo/graduation/rag/databases/xihu") -> None:
+    def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
+                 rag_database: str = "/home/wangb/cyo/graduation/rag/databases/hangzhou") -> None:
         # 初始化大模型
         self.model_name = model_name
         self.temperature = temperature
@@ -49,7 +49,7 @@ class LLMs:
         # print(prompt)
 
         response = self.model.chat.completions.create(
-            model="glm-4-plus",  # 填写需要调用的模型名称
+            model= self.model_name,
             messages=[
                 {"role": "user", "content": prompt},
             ]
@@ -90,6 +90,7 @@ def format_prompt(question: str, info: str) -> str:
 
 class VectorDatabase:
     def __init__(self, model = ZhipuAI(api_key="8cf93821658b7df312645b6dc443b871.aY8DFiq17G0NrVmx"),
+                 model_name = "glm-4-air",
                  rag_database: list[str] = ["/home/wangb/cyo/graduation/rag/databases/hangzhou",
                                             "/home/wangb/cyo/graduation/rag/databases/hangzhou_poi"]) -> None:
         # Load vector database and embedding model
@@ -98,8 +99,8 @@ class VectorDatabase:
         self.db_poi = Vectordatabase()
         self.db_poi.load_vector(rag_database[1])
         self.embedding_model = Zhipuembedding()
-        self.history = []
-        self.request_split = Request(model=model)
+        self.model_name = model_name
+        self.request_split = Request(model=model, model_name="glm-4-air")
 
     def get_related_route_info(self, query: str):
         # Use Request to divide query into pos_question and neg_question)

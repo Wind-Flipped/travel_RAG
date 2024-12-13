@@ -44,8 +44,8 @@ class ReactAgent:
                  max_steps: int = 10,
                  max_retries: int = 3,
                  illegal_early_stop_patience: int = 3,
-                 react_llm_name='glm-4-plus',
-                 planner_llm_name='glm-4-plus',
+                 react_llm_name='glm-4-air',
+                 planner_llm_name='glm-4-air',
                  #  logs_path = '../logs/',
                  city_file_path='../database/background/citySet.txt'
                  ) -> None:
@@ -55,10 +55,10 @@ class ReactAgent:
         self.mode = mode
 
         if 'glm-4' in react_llm_name:
-            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+            self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
             print("LLM's name is getting wrong")
-            self.llm = LLMs(rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+            self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
         if self.mode == 'zero_shot':
             self.agent_prompt = zeroshot_react_agent_prompt
@@ -67,7 +67,7 @@ class ReactAgent:
         elif self.mode == 'zero_shot_reformat_zh':
             self.agent_prompt = zeroshot_react_agent_prompt_reformat_zh
 
-        self.vector_database = VectorDatabase(model=self.llm.get_model())
+        self.vector_database = VectorDatabase(model=self.llm.get_model(), model_name=react_llm_name)
         self.react_name = react_llm_name
         self.planner_name = planner_llm_name
 
@@ -530,7 +530,7 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default="glm-4-plus")
+    parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
     args = parser.parse_args()
     agent = ReactAgent(None, mode='zero_shot_reformat_zh', tools=tools_list, max_steps=10, react_llm_name=args.model_name,
