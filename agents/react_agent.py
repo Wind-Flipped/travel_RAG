@@ -189,7 +189,7 @@ class ReactAgent:
             if action_type != "Planner":
                 if action_type in actionMapping:
                     pending_action = actionMapping[action_type]
-                elif action_type not in actionMapping:
+                else:
                     pending_action = 'invalidAction'
 
                 if pending_action in self.retry_record:
@@ -211,9 +211,8 @@ class ReactAgent:
                         return
 
                 if action_type == 'RestaurantInfo':
-                    self.action_info = f"餐厅{action_arg}的信息"
                     try:
-
+                        self.action_info = f"餐厅{action_arg}的信息"
                         self.current_data = self.tools[pending_action].run(action_arg)
                         self.current_observation = str(to_string(self.current_data))
                         self.scratchpad += self.current_observation
@@ -228,8 +227,8 @@ class ReactAgent:
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
                 elif action_type == 'RestaurantDistance':
-                    self.action_info = f"餐厅{action_arg.split(', ')[0]}到餐厅{action_arg.split(', ')[1]}的距离（千米）"
                     try:
+                        self.action_info = f"餐厅{action_arg.split(', ')[0]}到餐厅{action_arg.split(', ')[1]}的距离（千米）"
                         self.current_data = self.tools[pending_action].run_for_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
                         self.scratchpad += self.current_observation
@@ -244,8 +243,8 @@ class ReactAgent:
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
                 elif action_type == 'RestaurantSearch':
-                    self.action_info = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家餐厅的信息"
                     try:
+                        self.action_info = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家餐厅的信息"
                         self.current_data = self.tools[pending_action].get_nearest_restaurants(
                             float(action_arg.split(', ')[0]), float(action_arg.split(', ')[1]), int(action_arg.split(', ')[2]))
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
@@ -261,8 +260,8 @@ class ReactAgent:
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
                 elif action_type == 'AttractionSearch':
-                    self.action_info = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家景点的信息"
                     try:
+                        self.action_info = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家景点的信息"
                         self.current_data = self.tools[pending_action].get_nearest_restaurants(
                             float(action_arg.split(', ')[0]), float(action_arg.split(', ')[1]), int(action_arg.split(', ')[2]))
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
@@ -279,8 +278,8 @@ class ReactAgent:
 
 
                 elif action_type == 'AttractionInfo':
-                    self.action_info = f"景点{action_arg}的信息"
                     try:
+                        self.action_info = f"景点{action_arg}的信息"
                         self.current_data = self.tools[pending_action].run(action_arg)
                         self.current_observation = to_string(self.current_data).strip()
                         self.scratchpad += self.current_observation
@@ -294,9 +293,9 @@ class ReactAgent:
                         self.scratchpad += f'Illegal Attraction info Search. Please try again.'
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-                elif action_type == 'AttractionDistance':
-                    self.action_info = f"景点{action_arg.split(', ')[0]}到景点{action_arg.split(', ')[1]}的距离（千米）"
+                elif action_type == 'ttractionDistance':
                     try:
+                        self.action_info = f"景点{action_arg.split(', ')[0]}到景点{action_arg.split(', ')[1]}的距离（千米）"
                         self.current_data = self.tools[pending_action].run_for_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
                         self.current_observation = to_string(self.current_data).strip()
                         self.scratchpad += self.current_observation
@@ -537,7 +536,7 @@ if __name__ == '__main__':
     agent = ReactAgent(None, mode='zero_shot_reformat_zh', tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
 
-    number = 10
+    number = 30
     evaluator = Evaluator()
     queries = evaluator.generate_request(number=number)
     step = 1

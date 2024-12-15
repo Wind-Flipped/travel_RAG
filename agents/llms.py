@@ -17,7 +17,7 @@ class LLMs:
         # 初始化大模型
         self.model_name = model_name
         self.temperature = temperature
-        self.model = ZhipuAI(api_key="8cf93821658b7df312645b6dc443b871.aY8DFiq17G0NrVmx")
+        self.model = ZhipuAI(api_key="c006413c47710730c9d9196b57c9ce81.CdBwOpUKukSkBHZG")
 
         # 加载向量数据库，embedding模型
         # self.db = Vectordatabase()
@@ -89,7 +89,7 @@ def format_prompt(question: str, info: str) -> str:
     return template.format(question=question, info=format_info)
 
 class VectorDatabase:
-    def __init__(self, model = ZhipuAI(api_key="8cf93821658b7df312645b6dc443b871.aY8DFiq17G0NrVmx"),
+    def __init__(self, model = ZhipuAI(api_key="c006413c47710730c9d9196b57c9ce81.CdBwOpUKukSkBHZG"),
                  model_name = "glm-4-air",
                  rag_database: list[str] = ["/home/wangb/cyo/graduation/rag/databases/hangzhou",
                                             "/home/wangb/cyo/graduation/rag/databases/hangzhou_poi"]) -> None:

@@ -32,7 +32,7 @@ class Evaluator:
             want_attraction = "" if random_number1 > 0.5 else "不"
             want_restaurant = "" if random_number2 > 0.5 else "不"
             people = random.randint(1,6)
-            budget = people * random.randint(200,300)
+            budget = people * random.randint(150,300)
             query = self.generate_query(want_restaurant, want_attraction, restaurant_name, attraction_name, people, budget)
             self.queries.append(query)
             self.answers.append({"want_restaurant": want_restaurant, "want_attraction": want_attraction, "restaurant_name": restaurant_name, "attraction_name": attraction_name, "people": people, "budget": budget})
@@ -111,10 +111,14 @@ class Evaluator:
     def eval_budget(self, answer, restaurant1, restaurant2):
         price1 = self.restaurant.run(restaurant1)["price"]
         price2 = self.restaurant.run(restaurant2)["price"]
+        match = re.search(r'(\d+)', price1)
+        extracted_price1 = int(match.group(1))
+        match = re.search(r'(\d+)', price2)
+        extracted_price2 = int(match.group(1))
         people = answer["people"]
         budget = answer["budget"]
 
-        return (price1 + price2) * people <= budget
+        return (extracted_price1 + extracted_price2) * people <= budget
 
     def print_result(self):
         print(f"normal: {self.normal_num}")
@@ -128,16 +132,19 @@ class Evaluator:
 if __name__ == '__main__':
     restaurant = Restaurants()
     attraction = Attractions()
-    data = {'交通': '地铁', '早餐': '杭州西子湖四季酒店-WL BISTRO西湖餐厅(灵隐路店)', '上午景点': '盖叫天故居', '午餐': '弄堂里·江南名肴(西湖龙井路店)', '下午景点': '灵隐寺', '晚餐': '山外山菜馆(玉泉路店)', '晚上的景点': '西湖'}
-    attraction1 = data['上午景点']
-    lunch = data['午餐']
-    attraction2 = data['下午景点']
-    dinner = data['晚餐']
-    if attraction.run(attraction1) == f"There is no {attraction1} in this city.":
-        print("attraction1 not exist")
-    if restaurant.run(lunch) == f"There is no {lunch} in this city.":
-        print("lunch not exist")
-    if attraction.run(attraction2) == f"There is no {attraction2} in this city.":
-        print("attraction2 not exist")
-    if restaurant.run(dinner) == f"There is no {dinner} in this city.":
-        print("dinner not exist")
+    data = ""
+    # attraction1 = data['上午景点']
+    # lunch = data['午餐']
+    # attraction2 = data['下午景点']
+    # dinner = data['晚餐']
+    # price1 = restaurant.run(lunch)["price"]
+    # match = re.search(r'(\d+)', price1)
+    # if match:
+    #     extracted_price1 = int(match.group(1))
+    # price2 = restaurant.run(dinner)["price"]
+    # match = re.search(r'(\d+)', price2)
+    # if match:
+    #     extracted_price2 = int(match.group(1))
+    # people = 6
+    # budget = 1716
+    # print((extracted_price1 + extracted_price2) * people <= budget)
