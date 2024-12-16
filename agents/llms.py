@@ -13,11 +13,12 @@ from rag.component.request import Request
 
 class LLMs:
     def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
+                 api_key = "c006413c47710730c9d9196b57c9ce81.CdBwOpUKukSkBHZG",
                  rag_database: str = "/home/wangb/cyo/graduation/rag/databases/hangzhou") -> None:
         # 初始化大模型
         self.model_name = model_name
         self.temperature = temperature
-        self.model = ZhipuAI(api_key="c006413c47710730c9d9196b57c9ce81.CdBwOpUKukSkBHZG")
+        self.model = ZhipuAI(api_key=api_key)
 
         # 加载向量数据库，embedding模型
         # self.db = Vectordatabase()
@@ -27,7 +28,7 @@ class LLMs:
     # 定义chat方法
     def __call__(self, prompt: str, stop: list = None):
         response = self.model.chat.completions.create(
-            model=self.model_name,  # 填写需要调用的模型名称
+            model=self.model_name,
             stop = stop,
             messages=[
                 {"role": "user", "content": prompt},

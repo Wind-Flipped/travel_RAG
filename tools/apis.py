@@ -32,6 +32,17 @@ class Tools:
 
         return nearest_pois
 
+    def get_coordinate(self, name: str):
+        '''
+        get coordinate of name
+        :param name:
+        :return: (latitude, longitude)
+        '''
+        result = self.data[self.data['shopname'] == name]
+        if len(result) == 0:
+            return None
+        return (result.iloc[0].to_dict()['latitude'], result.iloc[0].to_dict()['longitude'])
+
     def get_one_shopname(self):
         return self.data.iloc[random.randint(0,len(self.data) - 1)]["shopname"]
 

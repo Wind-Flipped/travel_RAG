@@ -131,18 +131,19 @@ Travel Plan:"""
 
 PLANNER_INSTRUCTION_ZH = """您是一位熟练的规划师。根据提供的信息和查询，请为我提供一份详细的计划，包括餐厅名称和景点名称等具体内容。
 请注意，您计划中的所有信息应来自提供的数据。您必须遵循示例中给出的格式。此外，所有细节应符合常识。符号 '-' 表示该信息不必要。
-返回的结果以json格式输出，包括"交通"，"早餐"，"上午的景点"，"午餐"，"下午的景点"，"晚餐"，"晚上的景点"属性。
+返回的结果以json格式输出，包括"交通"，"早餐"，"上午景点"，"午餐"，"下午景点"，"晚餐"，"晚上景点"属性。若在一个时间段内要去多个景点，请按照顺序依次写出，并用符号 ',' 分隔。
 ***** 示例 *****
-给定信息：麦当劳大约10元一位，景点有西湖与杭州博物馆，餐厅有绿茶餐厅，价格大约50元，麦坡咖啡，价格大约70元，海底捞火锅，价格大约95元。
+给定信息：麦当劳大约10元一位，景点有西湖与杭州博物馆，灵隐寺，良渚公园，净慈寺和雷峰塔。餐厅有绿茶餐厅，价格大约50元，麦坡咖啡，价格大约70元，海底捞火锅，价格大约95元。
 查询：您能为4人制定一份在杭州的1日游计划，预算为1200元吗？ 
 旅行计划： 
 {{
-    "交通"："地铁" ,
-    "早餐"："麦当劳 ",
-    "上午景点"："西湖",
-    "午餐"："麦坡咖啡",
-    "下午景点"： "杭州博物馆",
-    "晚餐"："海底捞火锅"
+    "交通": "地铁" ,
+    "早餐": "麦当劳 ",
+    "上午景点": "西湖",
+    "午餐": "麦坡咖啡",
+    "下午景点":  "杭州博物馆, 净慈寺, 雷峰塔",
+    "晚餐": "海底捞火锅",
+    "晚上景点": "灵隐寺, 良渚公园"
 }}
 
 ***** 示例结束 *****
@@ -152,6 +153,16 @@ PLANNER_INSTRUCTION_ZH = """您是一位熟练的规划师。根据提供的信�
 旅行计划：
 
 """
+
+EVALUATE_REQUEST_ROUTE_ZH = """你好，针对用户需求"{request}"和一条路线{route}，请你根据参考信息帮我判断这条路线是否和用户需求有冲突,路线能否满足用户的需求，请根据参考信息判断，并输出一个0-100之间的分数，分数越高，表明路线越符合用户的需求。只用输出一个0-100的数字，不要输出其他内容。
+参考信息为{poi_info}
+该路线的分数为
+"""
+evaluate_request_route_zh = PromptTemplate(
+                        input_variables=["request", "route", "poi_info"],
+                        template=EVALUATE_REQUEST_ROUTE_ZH,
+                        )
+
 
 COT_PLANNER_INSTRUCTION = """You are a proficient planner. Based on the provided information and query, please give me a detailed plan, including specifics such as flight numbers (e.g., F0123456), restaurant names, and hotel names. Note that all the information in your plan should be derived from the provided data. You must adhere to the format given in the example. Additionally, all details should align with common sense. Attraction visits and meals are expected to be diverse. The symbol '-' indicates that information is unnecessary. For example, in the provided sample, you do not need to plan after returning to the departure city. When you travel to two cities in one day, you should note it in the 'Current City' section as in the example (i.e., from A to B). 
 

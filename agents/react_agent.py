@@ -536,7 +536,7 @@ if __name__ == '__main__':
     agent = ReactAgent(None, mode='zero_shot_reformat_zh', tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
 
-    number = 30
+    number = 1
     evaluator = Evaluator()
     queries = evaluator.generate_request(number=number)
     step = 1
