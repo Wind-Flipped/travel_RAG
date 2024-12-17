@@ -51,6 +51,13 @@ class Evaluator:
                 poi_file = json.load(file)
             self.poi_dict = {poi['name']: poi for poi in poi_file}
 
+            self.jaccard_similarity = 0
+            self.match_similarity = 0
+            self.center_distance = 0
+            self.distance_similarity = 0
+            self.request2route = 0
+            self.popularity_similarity = 0
+
 
     def generate_request(self, number : int = 50):
         while number > 0:
@@ -71,6 +78,123 @@ class Evaluator:
     def generate_query(self, want_restaurant, want_attraction, restaurant_name, attraction_name, people, budget):
         return f"请帮我规划一条在杭州的一日旅游路线，{want_attraction}想要去{attraction_name}游玩，{want_restaurant}想要吃{restaurant_name}类型的美食，一共有{people}个人，总共预算需要在{budget}元以内。"
 
+    def evaluate_real(self, agent_output, target_place, query, truth):
+        self.eval_log.append({"step": self.step, "normal": False,
+                              "complete": False, "attraction": False, "restaurant": False, "budget": False,
+                              "avg_distance": 0, "avg_score": 0,
+                              "jaccard_similarity": 0, "exact_match_similarity": 0, "center_distance": 0,
+                              "distance_similarity": 0, "request2route": 0, "popularity_similarity": 0})
+        all_flag = True
+        self.valid_restaurant = True
+        self.valid_attraction = True
+        answer = {"want_attraction": "", "attraction_name": target_place}
+        try:
+            match = re.search(r'(\{.*\})', agent_output, re.DOTALL)
+            if match:
+                extracted_json = match.group(1)
+                data = json.loads(extracted_json)
+                attraction1 = data['上午景点']
+                attraction1 = [item.strip() for item in attraction1.split(",")]
+                lunch = data['午餐']
+                attraction2 = data['下午景点']
+                attraction2 = [item.strip() for item in attraction2.split(",")]
+                dinner = data['晚餐']
+                attraction3 = data['晚上景点']
+                attraction3 = [item.strip() for item in attraction3.split(",")]
+                print(data)
+                attraction_list = attraction1 + attraction2 + attraction3
+                attraction_list = [item for item in attraction_list if item != "-"]
+                print(f"attraction_list {attraction_list}, lunch {lunch}, dinner {dinner}.")
+                self.normal_num += 1
+                self.eval_log[-1]["normal"] = True
+                if self.eval_complete(attraction_list, lunch, dinner):
+                    self.eval_log[-1]["complete"] = True
+                    self.complete_num += 1
+                    self.eval_distance(attraction_list)
+                else:
+                    all_flag = False
+
+                if self.valid_attraction and self.eval_attraction(answer, attraction_list):
+                    self.eval_log[-1]["attraction"] = True
+                    self.attraction_num += 1
+                else:
+                    all_flag = False
+
+                # if self.valid_restaurant and self.eval_restaurant(answer, lunch, dinner):
+                #     self.eval_log[-1]["restaurant"] = True
+                #     self.restaurant_num += 1
+                # else:
+                #     all_flag = False
+
+                # if self.eval_budget(answer, lunch, dinner):
+                #     self.eval_log[-1]["budget"] = True
+                #     self.budget_num += 1
+                # else:
+                #     all_flag = False
+
+                self.all_num += 1 if all_flag else 0
+                self.calculate_ai_similarity(attraction_list, query)
+
+                score = self.calculate_jaccard_similarity(attraction_list, truth)
+                self.jaccard_similarity += score
+                self.eval_log[-1]["jaccard_similarity"] = score
+
+                score = self.calculate_exact_match_similarity(attraction_list, truth)
+                self.match_similarity += score
+                self.eval_log[-1]["exact_match_similarity"] = score
+
+                score = self.calculate_distance_similarity(attraction_list, truth)
+                self.distance_similarity += score
+                self.eval_log[-1]["distance_similarity"] = score
+
+                score = self.calculate_popularity_similarity(attraction_list, truth)
+                self.popularity_similarity += score
+                self.eval_log[-1]["popularity_similarity"] = score
+
+                score = self.calculate_request2route(attraction_list, truth)
+                self.request2route += score
+                self.eval_log[-1]["request2route"] = score
+
+                self.avg_score += self.calculate_center_distance(attraction_list, truth)
+                self.eval_log[-1]["center_distance"] = self.avg_score
+                self.avg_distance += self.calculate_center_distance(attraction_list, truth)
+
+            else:
+                print("output wrong json")
+        except Exception as e:
+            print(e)
+            print(f'Step {self.step} result not completed')
+
+    def print_real_result(self):
+        print(f"normal: {self.normal_num}")
+        print(f"complete: {self.complete_num}")
+        print(f"attraction: {self.attraction_num}")
+        print(f"restaurant: {self.restaurant_num}")
+        print(f"budget: {self.budget_num}")
+        print(f"all: {self.all_num}")
+
+        print(f"avg distance: {self.avg_distance / self.valid_distance}")
+        print(f"avg score: {self.avg_score / self.valid_score}")
+
+        print(f"avg jaccard_similarity (+): {self.jaccard_similarity / self.normal_num}")
+        print(f"avg exact_match_similarity (+): {self.match_similarity / self.normal_num}")
+        print(f"avg distance_similarity (-): {self.distance_similarity / self.normal_num}")
+        print(f"avg request2route (+): {self.request2route / self.normal_num}")
+        print(f"avg popularity_similarity (-): {self.popularity_similarity / self.normal_num}")
+        print(f"avg center_distance (-): {self.center_distance / self.normal_num}")
+
+        self.eval_log.append(
+            {"normal": self.normal_num, "complete": self.complete_num, "attraction": self.attraction_num,
+             "restaurant": self.restaurant_num, "budget": self.budget_num, "all": self.all_num,
+             "avg_distance": self.avg_distance / self.valid_distance, "avg_score": self.avg_score / self.valid_score,
+             "jaccard_similarity": self.jaccard_similarity / self.normal_num, "exact_match_similarity": self.match_similarity / self.normal_num,
+             "distance_similarity": self.distance_similarity / self.normal_num, "request2route": self.request2route / self.normal_num,
+             "popularity_similarity": self.popularity_similarity / self.normal_num, "center_distance": self.center_distance / self.normal_num})
+        # save the results
+        with open(os.path.join(f'./logs/real_eval.json'), 'w') as f:
+            json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
+
+
     def evaluate(self, agent_output):
         self.eval_log.append({"step": self.step, "normal": False,
                               "complete": False, "attraction": False, "restaurant": False, "budget": False,
@@ -81,7 +205,6 @@ class Evaluator:
         all_flag = True
         self.valid_restaurant = True
         self.valid_attraction = True
-        print(agent_output)
         try:
             match = re.search(r'(\{.*\})', agent_output, re.DOTALL)
             if match:
@@ -206,14 +329,14 @@ class Evaluator:
             json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
 
 
-    def jaccard_similarity(self, route, truth):
+    def calculate_jaccard_similarity(self, route, truth):
         set1, set2 = set(route), set(truth)
         intersection = len(set1 & set2)
         union = len(set1 | set2)
         return intersection / union
 
 
-    def exact_match_similarity(self, route, truth):
+    def calculate_exact_match_similarity(self, route, truth):
         intersection = len(set(route) & set(route))
         return intersection / len(set(truth))
 

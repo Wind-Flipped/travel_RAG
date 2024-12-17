@@ -91,6 +91,7 @@ def format_prompt(question: str, info: str) -> str:
 
 class VectorDatabase:
     def __init__(self, model = ZhipuAI(api_key="c006413c47710730c9d9196b57c9ce81.CdBwOpUKukSkBHZG"),
+                 index=-1,
                  model_name = "glm-4-air",
                  rag_database: list[str] = ["/home/wangb/cyo/graduation/rag/databases/hangzhou",
                                             "/home/wangb/cyo/graduation/rag/databases/hangzhou_poi"]) -> None:
@@ -103,23 +104,23 @@ class VectorDatabase:
         self.model_name = model_name
         self.request_split = Request(model=model, model_name="glm-4-air")
 
-    def get_related_route_info(self, query: str):
+    def get_related_route_info(self, query: str, index=-1):
         # Use Request to divide query into pos_question and neg_question)
         pos_question, neg_question = self.request_split.extract_requests(query)
-        routes, pois = self.query_databases(pos_question, neg_question)
+        routes, pois = self.query_databases(pos_question, neg_question, index=index)
         return self.query_zh(routes, pois)
 
-    def query_route(self, pos_question, neg_question):
-        info = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
+    def query_route(self, pos_question, neg_question, index=-1):
+        info = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True, invisible=index)
         return info
 
-    def query_poi(self, pos_question, neg_question):
-        info = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
+    def query_poi(self, pos_question, neg_question, index=-1):
+        info = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True, invisible=index)
         return info
 
-    def query_databases(self, pos_question, neg_question):
-        routes = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
-        pois = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
+    def query_databases(self, pos_question, neg_question, index=-1):
+        routes = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True, invisible=index)
+        pois = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True, invisible=index)
 
         return routes, pois
     def query_zh(self, route_info, poi_info):

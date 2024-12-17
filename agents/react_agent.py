@@ -99,14 +99,14 @@ class ReactAgent:
 
         self.__reset_agent()
 
-    def run(self, query, reset=True) -> None:
+    def run(self, query, index=-1, reset=True) -> None:
 
         self.query = query
 
         if reset:
             self.__reset_agent()
 
-        self.route_info, self.poi_info = self.vector_database.get_related_route_info(self.query)
+        self.route_info, self.poi_info = self.vector_database.get_related_route_info(self.query, index=index)
 
         while not self.is_halted() and not self.is_finished():
             self.step()
@@ -532,44 +532,88 @@ if __name__ == '__main__':
     parser.add_argument("--set_type", type=str, default="test")
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
+    parser.add_argument("--dataset", type=str, default="real")
     args = parser.parse_args()
     agent = ReactAgent(None, mode='zero_shot_reformat_zh', tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
 
-    number = 1
-    evaluator = Evaluator()
-    queries = evaluator.generate_request(number=number)
-    step = 1
-    for query in tqdm(queries):
-        if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}')):
-            os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}'))
-        if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')):
-            result = [{}]
-        else:
-            result = json.load(
-                open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')))
+    if args.dataset == 'real':
+        evaluator = Evaluator(have_truth=True)
+        with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
+                  encoding='utf-8') as f:
+            all_data = json.load(f)
+        requires = all_data
+        print("The total number: " + str(len(requires)))
+
+        for index, item in tqdm(enumerate(requires)):
+            if index > 3:
+                break
+            query = item["ai_input"]
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}')):
+                os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}'))
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/generated_plan_{index}.json')):
+                result = [{}]
+            else:
+                result = json.load(
+                    open(os.path.join(f'{args.output_dir}/{args.dataset}/generated_plan_{index}.json')))
+
+            planner_results, scratchpad, action_log = agent.run(query=query, index=index)
+
+            if planner_results == 'Max Token Length Exceeded.':
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
+                action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+            else:
+                result[-1][f'{args.model_name}_two-stage_query'] = query
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+
+            # write to json file
+            with open(os.path.join(f'{args.output_dir}/{args.dataset}/generated_plan_{index}.json'), 'w') as f:
+                json.dump(result, f, indent=4, ensure_ascii=False)
+
+            evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
+                                    query=query, truth=item["route"])
+
+            evaluator.print_real_result()
+
+    else:
+        number = 1
+        evaluator = Evaluator()
+        queries = evaluator.generate_request(number=number)
+        step = 1
+        for query in tqdm(queries):
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}')):
+                os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}'))
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')):
+                result = [{}]
+            else:
+                result = json.load(
+                    open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')))
 
 
-        planner_results, scratchpad, action_log = agent.run(query)
+            planner_results, scratchpad, action_log = agent.run(query)
 
 
-        if planner_results == 'Max Token Length Exceeded.':
-            result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-            result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
-            action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
-            result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-        else:
-            result[-1][f'{args.model_name}_two-stage_query'] = query
-            result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-            result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-            result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+            if planner_results == 'Max Token Length Exceeded.':
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
+                action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+            else:
+                result[-1][f'{args.model_name}_two-stage_query'] = query
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
 
-        # write to json file
-        with open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{step}.json'), 'w') as f:
-            json.dump(result, f, indent=4, ensure_ascii=False)
+            # write to json file
+            with open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{step}.json'), 'w') as f:
+                json.dump(result, f, indent=4, ensure_ascii=False)
 
-        step += 1
+            step += 1
 
-        evaluator.evaluate(agent_output=planner_results)
+            evaluator.evaluate(agent_output=planner_results)
 
-    evaluator.print_result()
+            evaluator.print_result()
