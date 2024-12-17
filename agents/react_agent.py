@@ -39,7 +39,6 @@ actionMapping = {'RestaurantInfo':'restaurant_info', 'AttractionInfo':'attractio
 
 class ReactAgent:
     def __init__(self,
-                 args,
                  mode: str = 'zero_shot_reformat_zh',
                  tools: List[str] = None,
                  max_steps: int = 10,
@@ -105,8 +104,9 @@ class ReactAgent:
 
         if reset:
             self.__reset_agent()
+        if self.mode == 'zero_shot_reformat_zh':
+            self.route_info, self.poi_info = self.vector_database.get_related_route_info(self.query, index=index)
 
-        self.route_info, self.poi_info = self.vector_database.get_related_route_info(self.query, index=index)
 
         while not self.is_halted() and not self.is_finished():
             self.step()
@@ -376,7 +376,7 @@ class ReactAgent:
                 return "Error !"
 
     def _build_agent_prompt(self) -> str:
-        if self.mode == 'zero_shot':
+        if self.mode == 'zero_shot_zh':
             return self.agent_prompt.format(
                 query=self.query,
                 scratchpad=self.scratchpad)
@@ -533,8 +533,9 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
     parser.add_argument("--dataset", type=str, default="real")
+    parser.add_argument("--mode", type=str, default="zero_shot_zh")
     args = parser.parse_args()
-    agent = ReactAgent(None, mode='zero_shot_reformat_zh', tools=tools_list, max_steps=10, react_llm_name=args.model_name,
+    agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
 
     if args.dataset == 'real':
@@ -549,13 +550,13 @@ if __name__ == '__main__':
             if index > 3:
                 break
             query = item["ai_input"]
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}')):
-                os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}'))
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/generated_plan_{index}.json')):
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
+                os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}'))
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')):
                 result = [{}]
             else:
                 result = json.load(
-                    open(os.path.join(f'{args.output_dir}/{args.dataset}/generated_plan_{index}.json')))
+                    open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')))
 
             planner_results, scratchpad, action_log = agent.run(query=query, index=index)
 
@@ -571,13 +572,13 @@ if __name__ == '__main__':
                 result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
 
             # write to json file
-            with open(os.path.join(f'{args.output_dir}/{args.dataset}/generated_plan_{index}.json'), 'w') as f:
+            with open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json'), 'w') as f:
                 json.dump(result, f, indent=4, ensure_ascii=False)
 
             evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
                                     query=query, truth=item["route"])
 
-            evaluator.print_real_result()
+        evaluator.print_real_result()
 
     else:
         number = 1
@@ -585,13 +586,13 @@ if __name__ == '__main__':
         queries = evaluator.generate_request(number=number)
         step = 1
         for query in tqdm(queries):
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}')):
-                os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}'))
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')):
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}')):
+                os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}'))
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{number}.json')):
                 result = [{}]
             else:
                 result = json.load(
-                    open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json')))
+                    open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{number}.json')))
 
 
             planner_results, scratchpad, action_log = agent.run(query)
@@ -609,11 +610,11 @@ if __name__ == '__main__':
                 result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
 
             # write to json file
-            with open(os.path.join(f'{args.output_dir}/{args.set_type}/generated_plan_{step}.json'), 'w') as f:
+            with open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{step}.json'), 'w') as f:
                 json.dump(result, f, indent=4, ensure_ascii=False)
 
             step += 1
 
             evaluator.evaluate(agent_output=planner_results)
 
-            evaluator.print_result()
+        evaluator.print_result()

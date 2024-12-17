@@ -103,7 +103,7 @@ class Evaluator:
                 attraction3 = [item.strip() for item in attraction3.split(",")]
                 print(data)
                 attraction_list = attraction1 + attraction2 + attraction3
-                attraction_list = [item for item in attraction_list if item != "-"]
+                attraction_list = [item for item in attraction_list if item != "-" and item != ""]
                 print(f"attraction_list {attraction_list}, lunch {lunch}, dinner {dinner}.")
                 self.normal_num += 1
                 self.eval_log[-1]["normal"] = True
@@ -173,8 +173,8 @@ class Evaluator:
         print(f"budget: {self.budget_num}")
         print(f"all: {self.all_num}")
 
-        print(f"avg distance: {self.avg_distance / self.valid_distance}")
-        print(f"avg score: {self.avg_score / self.valid_score}")
+        print(f"avg distance: {self.avg_distance / self.valid_distance if self.valid_distance > 0 else 0}")
+        print(f"avg score: {self.avg_score / self.valid_score if self.valid_score > 0 else 0}")
 
         print(f"avg jaccard_similarity (+): {self.jaccard_similarity / self.normal_num}")
         print(f"avg exact_match_similarity (+): {self.match_similarity / self.normal_num}")
@@ -186,7 +186,8 @@ class Evaluator:
         self.eval_log.append(
             {"normal": self.normal_num, "complete": self.complete_num, "attraction": self.attraction_num,
              "restaurant": self.restaurant_num, "budget": self.budget_num, "all": self.all_num,
-             "avg_distance": self.avg_distance / self.valid_distance, "avg_score": self.avg_score / self.valid_score,
+             "avg_distance": self.avg_distance / self.valid_distance if self.valid_distance > 0 else 0,
+             "avg_score": self.avg_score / self.valid_score if self.valid_score > 0 else 0,
              "jaccard_similarity": self.jaccard_similarity / self.normal_num, "exact_match_similarity": self.match_similarity / self.normal_num,
              "distance_similarity": self.distance_similarity / self.normal_num, "request2route": self.request2route / self.normal_num,
              "popularity_similarity": self.popularity_similarity / self.normal_num, "center_distance": self.center_distance / self.normal_num})
@@ -220,7 +221,7 @@ class Evaluator:
                 attraction3 = [item.strip() for item in attraction3.split(",")]
                 print(data)
                 attraction_list = attraction1 + attraction2 + attraction3
-                attraction_list = [item for item in attraction_list if item != "-"]
+                attraction_list = [item for item in attraction_list if item != "-" and item != ""]
                 print(f"attraction_list {attraction_list}, lunch {lunch}, dinner {dinner}.")
                 self.normal_num += 1
                 self.eval_log[-1]["normal"] = True
@@ -319,11 +320,14 @@ class Evaluator:
         print(f"budget: {self.budget_num}")
         print(f"all: {self.all_num}")
 
-        print(f"avg distance: {self.avg_distance / self.valid_distance}")
-        print(f"avg score: {self.avg_score / self.valid_score}")
+        print(f"avg distance: {self.avg_distance / self.valid_distance if self.valid_distance > 0 else 0}")
+        print(f"avg score: {self.avg_score / self.valid_score if self.valid_score > 0 else 0}")
+
+
         self.eval_log.append({"normal": self.normal_num, "complete": self.complete_num, "attraction": self.attraction_num,
                               "restaurant": self.restaurant_num, "budget": self.budget_num, "all": self.all_num,
-                              "avg_distance": self.avg_distance / self.valid_distance, "avg_score": self.avg_score / self.valid_score})
+                              "avg_distance": self.avg_distance / self.valid_distance if self.valid_distance > 0 else 0,
+                              "avg_score": self.avg_score / self.valid_score if self.valid_score > 0 else 0})
         # save the results
         with open(os.path.join(f'./logs/eval.json'), 'w') as f:
             json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
