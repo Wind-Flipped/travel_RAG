@@ -13,7 +13,7 @@ from rag.component.request import Request
 
 class LLMs:
     def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
-                 api_key = "c006413c47710730c9d9196b57c9ce81.CdBwOpUKukSkBHZG",
+                 api_key = "c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE",
                  rag_database: str = "/home/wangb/cyo/graduation/rag/databases/hangzhou") -> None:
         # 初始化大模型
         self.model_name = model_name
