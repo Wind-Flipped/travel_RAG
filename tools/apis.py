@@ -30,7 +30,7 @@ class Tools:
         df['distance'] = df.apply(lambda row: calculate_distance((latitude, longitude), (row['latitude'], row['longitude'])), axis=1)
         nearest_pois = df.nsmallest(k, 'distance')
 
-        return nearest_pois
+        return nearest_pois.to_json(orient='records', force_ascii=False)
 
     def get_coordinate(self, name: str):
         '''

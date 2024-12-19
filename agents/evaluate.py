@@ -16,7 +16,7 @@ from prompts import evaluate_request_route_zh
 
 
 class Evaluator:
-    def __init__(self, have_truth = False, api_key = "c006413c47710730c9d9196b57c9ce81.CdBwOpUKukSkBHZG"):
+    def __init__(self, have_truth = False, api_key = "c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE"):
         self.restaurant = Restaurants()
         self.attraction = Attractions()
         self.queries = []
@@ -37,11 +37,11 @@ class Evaluator:
         self.valid_distance = 0
         self.avg_score = 0
         self.valid_score = 0
-        self.llm = LLMs(api_key=api_key)
+        self.llm = LLMs()
         self.eval_log = []
 
         if have_truth:
-            self.embedding_model = Zhipuembedding()
+            self.embedding_model = Zhipuembedding(api_key=api_key)
 
             with open("/home/wangb/cyo/graduation/rag/databases/popularity.json", 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -87,7 +87,7 @@ class Evaluator:
         all_flag = True
         self.valid_restaurant = True
         self.valid_attraction = True
-        answer = {"want_attraction": "", "attraction_name": target_place}
+        answer = {"want_attraction": "", "attraction_name": target_place[0]}
         try:
             match = re.search(r'(\{.*\})', agent_output, re.DOTALL)
             if match:
@@ -155,9 +155,9 @@ class Evaluator:
                 self.request2route += score
                 self.eval_log[-1]["request2route"] = score
 
-                self.avg_score += self.calculate_center_distance(attraction_list, truth)
-                self.eval_log[-1]["center_distance"] = self.avg_score
-                self.avg_distance += self.calculate_center_distance(attraction_list, truth)
+                score = self.calculate_center_distance(attraction_list, truth)
+                self.center_distance += score
+                self.eval_log[-1]["center_distance"] = score
 
             else:
                 print("output wrong json")
@@ -173,8 +173,8 @@ class Evaluator:
         print(f"budget: {self.budget_num}")
         print(f"all: {self.all_num}")
 
-        print(f"avg distance: {self.avg_distance / self.valid_distance if self.valid_distance > 0 else 0}")
-        print(f"avg score: {self.avg_score / self.valid_score if self.valid_score > 0 else 0}")
+        print(f"avg distance: {self.avg_distance / self.valid_distance if self.valid_distance > 0 else None}")
+        print(f"avg score: {self.avg_score / self.valid_score if self.valid_score > 0 else None}")
 
         print(f"avg jaccard_similarity (+): {self.jaccard_similarity / self.normal_num}")
         print(f"avg exact_match_similarity (+): {self.match_similarity / self.normal_num}")
@@ -186,8 +186,8 @@ class Evaluator:
         self.eval_log.append(
             {"normal": self.normal_num, "complete": self.complete_num, "attraction": self.attraction_num,
              "restaurant": self.restaurant_num, "budget": self.budget_num, "all": self.all_num,
-             "avg_distance": self.avg_distance / self.valid_distance if self.valid_distance > 0 else 0,
-             "avg_score": self.avg_score / self.valid_score if self.valid_score > 0 else 0,
+             "avg_distance": self.avg_distance / self.valid_distance if self.valid_distance > 0 else None,
+             "avg_score": self.avg_score / self.valid_score if self.valid_score > 0 else None,
              "jaccard_similarity": self.jaccard_similarity / self.normal_num, "exact_match_similarity": self.match_similarity / self.normal_num,
              "distance_similarity": self.distance_similarity / self.normal_num, "request2route": self.request2route / self.normal_num,
              "popularity_similarity": self.popularity_similarity / self.normal_num, "center_distance": self.center_distance / self.normal_num})
@@ -320,14 +320,14 @@ class Evaluator:
         print(f"budget: {self.budget_num}")
         print(f"all: {self.all_num}")
 
-        print(f"avg distance: {self.avg_distance / self.valid_distance if self.valid_distance > 0 else 0}")
-        print(f"avg score: {self.avg_score / self.valid_score if self.valid_score > 0 else 0}")
+        print(f"avg distance: {self.avg_distance / self.valid_distance if self.valid_distance > 0 else None}")
+        print(f"avg score: {self.avg_score / self.valid_score if self.valid_score > 0 else None}")
 
 
         self.eval_log.append({"normal": self.normal_num, "complete": self.complete_num, "attraction": self.attraction_num,
                               "restaurant": self.restaurant_num, "budget": self.budget_num, "all": self.all_num,
-                              "avg_distance": self.avg_distance / self.valid_distance if self.valid_distance > 0 else 0,
-                              "avg_score": self.avg_score / self.valid_score if self.valid_score > 0 else 0})
+                              "avg_distance": self.avg_distance / self.valid_distance if self.valid_distance > 0 else None,
+                              "avg_score": self.avg_score / self.valid_score if self.valid_score > 0 else None})
         # save the results
         with open(os.path.join(f'./logs/eval.json'), 'w') as f:
             json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
@@ -378,8 +378,8 @@ class Evaluator:
         for poi in poi_list:
             try:
                 lon, lat = self.get_poi_location(poi)
-                total_lat += lon
-                total_lon += lat
+                total_lat += lat
+                total_lon += lon
                 valid_poi_num += 1
             except ValueError as v:
                 print(v)

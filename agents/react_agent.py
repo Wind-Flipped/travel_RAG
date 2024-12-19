@@ -147,8 +147,6 @@ class ReactAgent:
         # self.scratchpad += f'Action {self.step_n}:'
         # action = self.prompt_agent()
         print(self.step_n)
-        print("--------------action------------------")
-        print(action)
 
         if action == None or action == '' or action == '\n':
             self.scratchpad += " Your action is filtered due to content. Please make sure your action does not start with ['\\n', 'Thought', 'Action', 'Observation'] and assume all the actions are permitted in this environment and take the action again."
@@ -230,6 +228,7 @@ class ReactAgent:
                     try:
                         self.action_info = f"餐厅{action_arg.split(', ')[0]}到餐厅{action_arg.split(', ')[1]}的距离（千米）"
                         self.current_data = self.tools[pending_action].run_for_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
+                        self.current_data = f"餐厅{action_arg.split(', ')[0]}到餐厅{action_arg.split(', ')[1]}的距离为{self.current_data}千米"
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
                         self.scratchpad += self.current_observation
                         self.__reset_record()
@@ -293,10 +292,11 @@ class ReactAgent:
                         self.scratchpad += f'Illegal Attraction info Search. Please try again.'
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-                elif action_type == 'ttractionDistance':
+                elif action_type == 'AttractionDistance':
                     try:
                         self.action_info = f"景点{action_arg.split(', ')[0]}到景点{action_arg.split(', ')[1]}的距离（千米）"
                         self.current_data = self.tools[pending_action].run_for_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
+                        self.current_data = f"景点{action_arg.split(', ')[0]}到景点{action_arg.split(', ')[1]}的距离为{self.current_data}千米"
                         self.current_observation = to_string(self.current_data).strip()
                         self.scratchpad += self.current_observation
                         self.__reset_record()
@@ -321,7 +321,7 @@ class ReactAgent:
                 # try:
 
                 self.current_observation = str(
-                    self.tools["planner"].run(str(self.tools['notebook'].list_all()), action_arg))
+                    self.tools["planner"].run(str(self.tools['notebook'].list_all()), query=action_arg, route=self.route_info))
                 self.scratchpad += self.current_observation
                 self.answer = self.current_observation
                 self.__reset_record()
@@ -547,8 +547,6 @@ if __name__ == '__main__':
         print("The total number: " + str(len(requires)))
 
         for index, item in tqdm(enumerate(requires)):
-            if index > 3:
-                break
             query = item["ai_input"]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
                 os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}'))

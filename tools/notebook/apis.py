@@ -28,7 +28,6 @@ class Notebook:
                 results.append({"index":idx, "Short Description":unit['Short Description'], "Content":unit['Content'].to_string(index=False)})
             else:
                 results.append({"index":idx, "Short Description":unit['Short Description'], "Content":unit['Content']})
-        
         return results
     
     def read(self, index):

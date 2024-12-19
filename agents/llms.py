@@ -1,10 +1,9 @@
 from zhipuai import ZhipuAI
-from embedding import Zhipuembedding
-# from data_chunker import ReadFile
-# from databases import Vectordatabase
-from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
+from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
+
+
 
 from rag.component.embedding import Zhipuembedding
 from rag.component.data_chunker import ReadFile
@@ -90,7 +89,7 @@ def format_prompt(question: str, info: str) -> str:
     return template.format(question=question, info=format_info)
 
 class VectorDatabase:
-    def __init__(self, model = ZhipuAI(api_key="c006413c47710730c9d9196b57c9ce81.CdBwOpUKukSkBHZG"),
+    def __init__(self, model = ZhipuAI(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE"),
                  index=-1,
                  model_name = "glm-4-air",
                  rag_database: list[str] = ["/home/wangb/cyo/graduation/rag/databases/hangzhou",
@@ -100,7 +99,7 @@ class VectorDatabase:
         self.db_route.load_vector(rag_database[0])
         self.db_poi = Vectordatabase()
         self.db_poi.load_vector(rag_database[1])
-        self.embedding_model = Zhipuembedding()
+        self.embedding_model = Zhipuembedding(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE")
         self.model_name = model_name
         self.request_split = Request(model=model, model_name="glm-4-air")
 

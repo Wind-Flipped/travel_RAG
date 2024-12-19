@@ -41,19 +41,20 @@ class Planner:
 
         print(f"PlannerAgent {model_name} loaded.")
 
-    def run(self, text, query, log_file=None) -> str:
+    def run(self, text, query, route, log_file=None) -> str:
         if log_file:
             log_file.write('\n---------------Planner\n'+self._build_agent_prompt(text, query))
         # print(self._build_agent_prompt(text, query))
         if 'glm-4' in self.model_name:
-            return str(self.llm(self._build_agent_prompt(text, query)))
+            return str(self.llm(self._build_agent_prompt(text, query, route)))
         else:
-            return str(self.llm(self._build_agent_prompt(text, query)))
+            return str(self.llm(self._build_agent_prompt(text, query, route)))
 
-    def _build_agent_prompt(self, text, query) -> str:
+    def _build_agent_prompt(self, text, query, route) -> str:
         return self.agent_prompt.format(
             text=text,
-            query=query)
+            query=query,
+            route=route)
 
 '''
 class ReactPlanner:
