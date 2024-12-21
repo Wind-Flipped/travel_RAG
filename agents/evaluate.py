@@ -84,6 +84,7 @@ class Evaluator:
                               "avg_distance": 0, "avg_score": 0,
                               "jaccard_similarity": 0, "exact_match_similarity": 0, "center_distance": 0,
                               "distance_similarity": 0, "request2route": 0, "popularity_similarity": 0})
+        self.step += 1
         all_flag = True
         self.valid_restaurant = True
         self.valid_attraction = True
@@ -107,7 +108,7 @@ class Evaluator:
                 print(f"attraction_list {attraction_list}, lunch {lunch}, dinner {dinner}.")
                 self.normal_num += 1
                 self.eval_log[-1]["normal"] = True
-                if self.eval_complete(attraction_list, lunch, dinner):
+                if self.eval_complete(attraction_list, "金猪", "金猪"):
                     self.eval_log[-1]["complete"] = True
                     self.complete_num += 1
                     self.eval_distance(attraction_list)
@@ -486,8 +487,6 @@ class Evaluator:
                 route=route,
                 poi_info=format_poi_info)
         response = self.llm(template)
-        print("++++++++++++++++++")
-        print(response)
         match = re.search(r'(\d+)', response)
         if match:
             score = int(match.group(1))

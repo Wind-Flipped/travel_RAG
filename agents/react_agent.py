@@ -24,6 +24,7 @@ import tools.apis as apis
 from tools.notebook.apis import Notebook
 from tools.planner.apis import Planner
 from evaluate import Evaluator
+import time
 
 # OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 
@@ -211,7 +212,7 @@ class ReactAgent:
                     try:
                         self.action_info = f"餐厅{action_arg}的信息"
                         self.current_data = self.tools[pending_action].run(action_arg)
-                        self.current_observation = str(to_string(self.current_data))
+                        self.current_observation = f"餐厅{action_arg}的信息为{self.current_data}"
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
@@ -245,7 +246,7 @@ class ReactAgent:
                         self.action_info = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家餐厅的信息"
                         self.current_data = self.tools[pending_action].get_nearest_restaurants(
                             float(action_arg.split(', ')[0]), float(action_arg.split(', ')[1]), int(action_arg.split(', ')[2]))
-                        self.current_observation = to_string(self.current_data).strip('\n').strip()
+                        self.current_observation =f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家餐厅的信息为：{self.current_data}"
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
@@ -262,7 +263,7 @@ class ReactAgent:
                         self.action_info = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家景点的信息"
                         self.current_data = self.tools[pending_action].get_nearest_restaurants(
                             float(action_arg.split(', ')[0]), float(action_arg.split(', ')[1]), int(action_arg.split(', ')[2]))
-                        self.current_observation = to_string(self.current_data).strip('\n').strip()
+                        self.current_observation = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家景点的信息为{self.current_data}"
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
@@ -279,7 +280,7 @@ class ReactAgent:
                     try:
                         self.action_info = f"景点{action_arg}的信息"
                         self.current_data = self.tools[pending_action].run(action_arg)
-                        self.current_observation = to_string(self.current_data).strip()
+                        self.current_observation = f"景点{action_arg}的信息为{self.current_data}"
                         self.scratchpad += self.current_observation
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
@@ -337,7 +338,7 @@ class ReactAgent:
                 # try:
 
                 self.current_observation = str(
-                    self.tools["planner"].run(str(self.tools['notebook'].list_all()), query=action_arg, route=self.route_info))
+                    self.tools["planner"].run(self.scratchpad, query=action_arg, route=self.route_info))
                 self.scratchpad += self.current_observation
                 self.answer = self.current_observation
                 self.__reset_record()
@@ -373,14 +374,7 @@ class ReactAgent:
             try:
                 # print(self._build_agent_prompt())
                 if 'glm-4' in self.react_name:
-                    # print("Begin to generate----------")
                     request = format_step(self.llm(self._build_agent_prompt()))
-                    # print("------------scratchpad-----------")
-                    # print(self.scratchpad)
-                    # print("------------request--------------")
-                    # print(request)
-                elif self.react_name == 'gemini':
-                    request = format_step(self.llm.invoke(self._build_agent_prompt(), stop=['\n']).content)
                 else:
                     # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
                     request = " "
@@ -555,6 +549,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
+    start_time = time.time()
 
     if args.dataset == 'real':
         evaluator = Evaluator(have_truth=True)
@@ -636,3 +631,6 @@ if __name__ == '__main__':
             evaluator.evaluate(agent_output=planner_results)
 
         evaluator.print_result()
+    end_time = time.time()
+
+    print(f"Time taken: {end_time - start_time} seconds")

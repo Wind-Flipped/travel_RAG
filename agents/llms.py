@@ -20,7 +20,7 @@ class LLMs:
         self.model = ZhipuAI(api_key=api_key)
 
         # 加载向量数据库，embedding模型
-        # self.db = Vectordatabase()
+        # self.db = Vectordatabase(api_key=api_key)
         # self.db.load_vector(rag_database)
         # self.embedding_model = Zhipuembedding()
 
@@ -36,57 +36,10 @@ class LLMs:
 
         return response.choices[0].message.content
 
-    def chat(self, pos_question: str, neg_question: str, answer_type: str = "explain"):
-        info = self.db.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True)
-        # for tmp in info:
-        #     print(tmp)
-        #     print('----------------------------')
-
-        if answer_type == "explain":
-            prompt = format_prompt_explain(pos_question + neg_question, info)
-        else:
-            prompt = format_prompt(pos_question + neg_question, info)
-        # print(prompt)
-
-        response = self.model.chat.completions.create(
-            model= self.model_name,
-            messages=[
-                {"role": "user", "content": prompt},
-            ]
-        )
-        return response.choices[0].message.content
 
     def get_model(self):
         return self.model
 
-
-def format_prompt_explain(question: str, info: str) -> str:
-    # 这里利用输入的问题与向量数据库里的相似度来匹配最相关的信息，填充到输入的提示词中
-    template = """使用以上下文来回答用户的问题。如果你不知道答案，就说你不知道。总是使用中文回答。
-        问题: {question}
-        可参考的上下文是多条由关键词，路线和帖子组成的数据：
-        ···
-        {info}
-        ···
-        如果给定的上下文无法让你做出回答，请回答数据库中没有这个内容，你不知道。
-        有用的回答:"""
-    format_info = "\n".join(f"第{index + 1}条数据: {item}" for index, item in enumerate(info))
-    return template.format(question=question, info=format_info)
-
-
-def format_prompt(question: str, info: str) -> str:
-    # 这里利用输入的问题与向量数据库里的相似度来匹配最相关的信息，填充到输入的提示词中
-    template = """使用以上下文来回答用户的问题。如果你不知道答案，就说你不知道。总是使用中文回答。
-        问题: {question}
-        可参考的上下文是多条由关键词，路线和帖子组成的数据：
-        ···
-        {info}
-        ···
-        如果给定的上下文无法让你做出回答，请回答数据库中没有这个内容，你不知道。
-        答案以一个地点列表给出，用逗号分开，不要输出多余内容。
-        有用的回答:"""
-    format_info = "\n".join(f"第{index + 1}条数据: {item}" for index, item in enumerate(info))
-    return template.format(question=question, info=format_info)
 
 class VectorDatabase:
     def __init__(self, model = ZhipuAI(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE"),
@@ -103,6 +56,9 @@ class VectorDatabase:
         self.model_name = model_name
         self.request_split = Request(model=model, model_name="glm-4-air")
 
+    def run(self, pos_question, number = 3, index=-1):
+        return self.db_poi.query_both(pos_question, None, self.embedding_model, number, 1, True, invisible=index)
+
     def get_related_route_info(self, query: str, index=-1):
         # Use Request to divide query into pos_question and neg_question)
         pos_question, neg_question = self.request_split.extract_requests(query)
@@ -118,8 +74,8 @@ class VectorDatabase:
         return info
 
     def query_databases(self, pos_question, neg_question, index=-1):
-        routes = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True, invisible=index)
-        pois = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 3, 3, True, invisible=index)
+        routes = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 2, 2, True, invisible=index)
+        pois = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 2, 2, True, invisible=index)
 
         return routes, pois
     def query_zh(self, route_info, poi_info):
