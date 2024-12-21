@@ -35,7 +35,7 @@ os.environ['TIKTOKEN_CACHE_DIR'] = './tmp'
 actionMapping = {'RestaurantInfo':'restaurant_info', 'AttractionInfo':'attraction_info',
                  'RestaurantDistance':'restaurant_distance', 'AttractionDistance':'attraction_distance',
                  'RestaurantSearch': 'restaurant_search', 'AttractionSearch':'attraction_search',
-                 'Notebook':'notebook','Planner':'planner'}
+                 'Notebook':'notebook','Planner':'planner', 'AttractionRetrieval': 'attraction_retrieval'}
 
 class ReactAgent:
     def __init__(self,
@@ -126,15 +126,14 @@ class ReactAgent:
         except:
             self.retry_record['invalidAction'] += 1
             print(f'Invalid Thought or Action: {generate_text}')
-            self.current_observation = 'Invalid Action.'
+            self.json_log[-1]["Thought"] = generate_text
+            self.current_observation = '您生成了一条非法指令，请检查您的指令是否正确，需要重新以“Thought”、“Action”的指令格式生成接下来的规划与行动，已经搜集完足够信息后，请调用Planner工具得到最终的路线规划。'
             self.scratchpad += self.current_observation
             self.json_log[-1]['state'] = f'invalidAction'
             self.step_n += 1
             return
         self.scratchpad += f'\nThought {self.step_n}: {thought}. Action {self.step_n}: {action}'
 
-        print(f"===============scratchpad {self.step_n}===================")
-        print(self.scratchpad)
         print(f"===============scratchpad {self.step_n}===================")
 
 
@@ -309,6 +308,23 @@ class ReactAgent:
                         self.scratchpad += f'Illegal Attraction Distance Search. Please try again.'
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
+                elif action_type == 'AttractionRetrieval':
+                    try:
+                        self.action_info = f"查找到与{action_arg.split(', ')[0]}类型相似的景点信息"
+                        self.current_data = self.tools[pending_action].run(action_arg.split(', ')[0], int(action_arg.split(', ')[1]))
+                        self.current_data = f"查找到与{action_arg.split(', ')[0]}类型相似的景点信息为{self.current_data}"
+                        self.current_observation = to_string(self.current_data).strip()
+                        self.scratchpad += self.current_observation
+                        self.__reset_record()
+                        self.json_log[-1]['state'] = f'Successful'
+
+                    except Exception as e:
+                        print(e)
+                        self.retry_record[pending_action] += 1
+                        self.current_observation = f'Illegal Attraction Retrieval Search. Please try again.'
+                        self.scratchpad += f'Illegal Attraction Retrieval Search. Please try again.'
+                        self.json_log[-1]['state'] = f'Illegal args. Other Error'
+
                 try:
                     # store observation to notebook
                     self.tools['notebook'].write(self.current_data, self.action_info)
@@ -424,6 +440,8 @@ class ReactAgent:
                 tools_map[tool_name] = Notebook()
             elif tool_name == 'planner':
                 tools_map[tool_name] = Planner(self.planner_name)
+            elif tool_name == 'attraction_retrieval':
+                tools_map[tool_name] = self.vector_database
         return tools_map
 
     def load_city(self, city_set_path: str) -> List[str]:
@@ -526,14 +544,14 @@ def to_string(data) -> str:
 if __name__ == '__main__':
 
     tools_list = ['restaurant_info', 'attraction_info', 'restaurant_distance', 'attraction_distance',
-                  'restaurant_search', 'attraction_search', 'notebook', 'planner']
+                  'restaurant_search', 'attraction_search', 'notebook', 'planner', 'attraction_retrieval']
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
     parser.add_argument("--dataset", type=str, default="real")
-    parser.add_argument("--mode", type=str, default="zero_shot_zh")
+    parser.add_argument("--mode", type=str, default="zero_shot_reformat_zh")
     args = parser.parse_args()
     agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
@@ -547,6 +565,8 @@ if __name__ == '__main__':
         print("The total number: " + str(len(requires)))
 
         for index, item in tqdm(enumerate(requires)):
+            if index > 2:
+                break
             query = item["ai_input"]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
                 os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}'))
@@ -576,7 +596,7 @@ if __name__ == '__main__':
             evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
                                     query=query, truth=item["route"])
 
-        evaluator.print_real_result()
+        evaluator.print_real_result(args.mode)
 
     else:
         number = 1

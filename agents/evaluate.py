@@ -165,7 +165,7 @@ class Evaluator:
             print(e)
             print(f'Step {self.step} result not completed')
 
-    def print_real_result(self):
+    def print_real_result(self, mode):
         print(f"normal: {self.normal_num}")
         print(f"complete: {self.complete_num}")
         print(f"attraction: {self.attraction_num}")
@@ -192,7 +192,9 @@ class Evaluator:
              "distance_similarity": self.distance_similarity / self.normal_num, "request2route": self.request2route / self.normal_num,
              "popularity_similarity": self.popularity_similarity / self.normal_num, "center_distance": self.center_distance / self.normal_num})
         # save the results
-        with open(os.path.join(f'./logs/real_eval.json'), 'w') as f:
+        if not os.path.exists(f'./logs/{mode}'):
+            os.makedirs(f'./logs/{mode}')
+        with open(os.path.join(f'./logs/{mode}/real_eval.json'), 'w') as f:
             json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
 
 
@@ -341,7 +343,7 @@ class Evaluator:
 
 
     def calculate_exact_match_similarity(self, route, truth):
-        intersection = len(set(route) & set(route))
+        intersection = len(set(route) & set(truth))
         return intersection / len(set(truth))
 
 
@@ -491,7 +493,7 @@ class Evaluator:
             score = int(match.group(1))
             self.avg_score += score
             self.valid_score += 1
-            self.eval_log[-1]["avg_budget"] = score
+            self.eval_log[-1]["avg_score"] = score
 
 
 
