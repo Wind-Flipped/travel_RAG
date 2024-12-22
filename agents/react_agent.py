@@ -560,8 +560,6 @@ if __name__ == '__main__':
         print("The total number: " + str(len(requires)))
 
         for index, item in tqdm(enumerate(requires)):
-            if index > 2:
-                break
             query = item["ai_input"]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
                 os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}'))
@@ -570,24 +568,29 @@ if __name__ == '__main__':
             else:
                 result = json.load(
                     open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')))
+            try:
+                planner_results, scratchpad, action_log = agent.run(query=query, index=index)
 
-            planner_results, scratchpad, action_log = agent.run(query=query, index=index)
+                if planner_results == 'Max Token Length Exceeded.':
+                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                    result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
+                    action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
+                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+                else:
+                    result[-1][f'{args.model_name}_two-stage_query'] = query
+                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                    result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
 
-            if planner_results == 'Max Token Length Exceeded.':
-                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-                result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
-                action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
-                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-            else:
+                # write to json file
+                with open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json'), 'w') as f:
+                    json.dump(result, f, indent=4, ensure_ascii=False)
+            except:
+                planner_results = "Error in results"
                 result[-1][f'{args.model_name}_two-stage_query'] = query
-                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = None
                 result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-
-            # write to json file
-            with open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json'), 'w') as f:
-                json.dump(result, f, indent=4, ensure_ascii=False)
-
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = None
             evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
                                     query=query, truth=item["route"])
 

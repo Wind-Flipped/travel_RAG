@@ -61,7 +61,10 @@ class VectorDatabase:
 
     def get_related_route_info(self, query: str, index=-1):
         # Use Request to divide query into pos_question and neg_question)
-        pos_question, neg_question = self.request_split.extract_requests(query)
+        try:
+            pos_question, neg_question = self.request_split.extract_requests(query)
+        except:
+            pos_question, neg_question = query, None
         routes, pois = self.query_databases(pos_question, neg_question, index=index)
         return self.query_zh(routes, pois)
 
