@@ -78,6 +78,84 @@ class Evaluator:
     def generate_query(self, want_restaurant, want_attraction, restaurant_name, attraction_name, people, budget):
         return f"请帮我规划一条在杭州的一日旅游路线，{want_attraction}想要去{attraction_name}游玩，{want_restaurant}想要吃{restaurant_name}类型的美食，一共有{people}个人，总共预算需要在{budget}元以内。"
 
+    def evaluate_baseline(self, agent_output, target_place, query, truth):
+        self.eval_log.append({"step": self.step, "normal": False,
+                              "complete": False, "attraction": False, "restaurant": False, "budget": False,
+                              "avg_distance": 0, "avg_score": 0,
+                              "jaccard_similarity": 0, "exact_match_similarity": 0, "center_distance": 0,
+                              "distance_similarity": 0, "request2route": 0, "popularity_similarity": 0})
+        self.step += 1
+        all_flag = True
+        self.valid_restaurant = True
+        self.valid_attraction = True
+        answer = {"want_attraction": "", "attraction_name": target_place[0]}
+        try:
+            pattern = "\"route\": \"(.*)\""
+            match = re.search(pattern, agent_output)
+            if match:
+                result = match.group(1)
+                attraction_list = result.split(",")
+                print(f"attraction_list {attraction_list}")
+                self.normal_num += 1
+                self.eval_log[-1]["normal"] = True
+                if self.eval_complete(attraction_list, "金猪", "金猪"):
+                    self.eval_log[-1]["complete"] = True
+                    self.complete_num += 1
+                    self.eval_distance(attraction_list)
+                else:
+                    all_flag = False
+
+                if self.eval_attraction(answer, attraction_list):
+                    self.eval_log[-1]["attraction"] = True
+                    self.attraction_num += 1
+                else:
+                    all_flag = False
+
+                # if self.valid_restaurant and self.eval_restaurant(answer, lunch, dinner):
+                #     self.eval_log[-1]["restaurant"] = True
+                #     self.restaurant_num += 1
+                # else:
+                #     all_flag = False
+
+                # if self.eval_budget(answer, lunch, dinner):
+                #     self.eval_log[-1]["budget"] = True
+                #     self.budget_num += 1
+                # else:
+                #     all_flag = False
+
+                self.all_num += 1 if all_flag else 0
+                self.calculate_ai_similarity(attraction_list, query)
+
+                score = self.calculate_jaccard_similarity(attraction_list, truth)
+                self.jaccard_similarity += score
+                self.eval_log[-1]["jaccard_similarity"] = score
+
+                score = self.calculate_exact_match_similarity(attraction_list, truth)
+                self.match_similarity += score
+                self.eval_log[-1]["exact_match_similarity"] = score
+
+                score = self.calculate_distance_similarity(attraction_list, truth)
+                self.distance_similarity += score
+                self.eval_log[-1]["distance_similarity"] = score
+
+                score = self.calculate_popularity_similarity(attraction_list, truth)
+                self.popularity_similarity += score
+                self.eval_log[-1]["popularity_similarity"] = score
+
+                score = self.calculate_request2route(attraction_list, truth)
+                self.request2route += score
+                self.eval_log[-1]["request2route"] = score
+
+                score = self.calculate_center_distance(attraction_list, truth)
+                self.center_distance += score
+                self.eval_log[-1]["center_distance"] = score
+
+            else:
+                print("output wrong json")
+        except Exception as e:
+            print(e)
+            print(f'Step {self.step} result not completed')
+
     def evaluate_real(self, agent_output, target_place, query, truth):
         self.eval_log.append({"step": self.step, "normal": False,
                               "complete": False, "attraction": False, "restaurant": False, "budget": False,

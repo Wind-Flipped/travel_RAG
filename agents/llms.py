@@ -1,6 +1,6 @@
 from zhipuai import ZhipuAI
 import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
+# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
 
 
@@ -59,6 +59,21 @@ class VectorDatabase:
     def run(self, pos_question, number = 3, index=-1):
         return self.db_poi.query_both(pos_question, None, self.embedding_model, number, 1, True, invisible=index)
 
+    def test_query(self, query: str, index=-1):
+        try:
+            pos_question, neg_question = self.request_split.extract_requests(query)
+            print("pos_question")
+            print(pos_question)
+            print("neg_question")
+            print(neg_question)
+        except:
+            pos_question, neg_question = query, None
+        # pos_question, neg_question = query, None
+        print("__________++++++++++++++++_______________")
+        routes = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 4, 1, True, invisible=index)
+
+        pois = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 4, 1,  True, invisible=index)
+        return self.query_zh(routes, pois)
     def get_related_route_info(self, query: str, index=-1):
         # Use Request to divide query into pos_question and neg_question)
         try:

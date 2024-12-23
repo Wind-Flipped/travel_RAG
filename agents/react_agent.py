@@ -122,8 +122,8 @@ class ReactAgent:
         # self.scratchpad += f'\nThought {self.step_n}:'
         generate_text = self.prompt_agent()
         try:
-            thought = re.search(r'Thought \d+: ([^A。.]+)', generate_text).group(1)
-            action = re.search(r"Action \d+: (.*?\[.*?\])", generate_text).group(1)
+            thought = re.search(r'Thought [\d+]: ([^A。.]+)', generate_text).group(1)
+            action = re.search(r"Action [\d+]: (.*?\[.*?\])", generate_text).group(1)
         except:
             self.retry_record['invalidAction'] += 1
             print(f'Invalid Thought or Action: {generate_text}')
@@ -336,9 +336,12 @@ class ReactAgent:
 
             elif action_type == "Planner":
                 # try:
-
-                self.current_observation = str(
-                    self.tools["planner"].run(self.scratchpad, query=action_arg, route=self.route_info))
+                if self.mode == 'zero_shot_zh':
+                    self.current_observation = str(
+                        self.tools["planner"].run(self.scratchpad, query=action_arg, route=None))
+                elif self.mode == 'zero_shot_reformat_zh':
+                    self.current_observation = str(
+                        self.tools["planner"].run(self.scratchpad, query=action_arg, route=self.route_info))
                 self.scratchpad += self.current_observation
                 self.answer = self.current_observation
                 self.__reset_record()
@@ -433,7 +436,7 @@ class ReactAgent:
             elif tool_name == 'notebook':
                 tools_map[tool_name] = Notebook()
             elif tool_name == 'planner':
-                tools_map[tool_name] = Planner(self.planner_name)
+                tools_map[tool_name] = Planner(self.planner_name, mode=self.mode)
             elif tool_name == 'attraction_retrieval':
                 tools_map[tool_name] = self.vector_database
         return tools_map
@@ -545,7 +548,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
     parser.add_argument("--dataset", type=str, default="real")
-    parser.add_argument("--mode", type=str, default="zero_shot_reformat_zh")
+    parser.add_argument("--mode", type=str, default='zero_shot_zh')
     args = parser.parse_args()
     agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)

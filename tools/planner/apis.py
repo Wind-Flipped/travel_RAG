@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
-from agents.prompts import planner_agent_prompt, planner_agent_prompt_zh, cot_planner_agent_prompt, react_planner_agent_prompt,reflect_prompt,react_reflect_planner_agent_prompt, REFLECTION_HEADER
+from agents.prompts import planner_agent_prompt, planner_agent_prompt_zh, planner_zero_shot_zh
 # from env import ReactEnv,ReactReflectEnv
 
 import re
@@ -25,10 +25,14 @@ class Planner:
     def __init__(self,
                  # args,
                  model_name: str = 'glm-4-air',
-                 agent_prompt = planner_agent_prompt_zh,
+                 mode = "planner_agent_prompt_zh",
                  ) -> None:
+        self.mode = mode
+        if mode == "planner_agent_prompt_zh":
+            self.agent_prompt = planner_agent_prompt_zh
+        elif mode == "zero_shot_zh":
+            self.agent_prompt = planner_zero_shot_zh
 
-        self.agent_prompt = agent_prompt
         self.scratchpad: str = ''
         self.model_name = model_name
 
@@ -41,18 +45,23 @@ class Planner:
 
         print(f"PlannerAgent {model_name} loaded.")
 
-    def run(self, text, query, route) -> str:
+    def run(self, text, query, route=None) -> str:
         # print(self._build_agent_prompt(text, query))
-        if 'glm-4' in self.model_name:
+        if self.mode == "planner_agent_prompt_zh":
             return str(self.llm(self._build_agent_prompt(text, query, route)))
-        else:
+        elif self.mode == "zero_shot_zh":
             return str(self.llm(self._build_agent_prompt(text, query, route)))
 
     def _build_agent_prompt(self, text, query, route) -> str:
-        return self.agent_prompt.format(
-            text=text,
-            query=query,
-            route=route)
+        if self.mode == "planner_agent_prompt_zh":
+            return self.agent_prompt.format(
+                text=text,
+                query=query,
+                route=route)
+        elif self.mode == "zero_shot_zh":
+            return self.agent_prompt.format(
+                text=text,
+                query=query,)
 
 '''
 class ReactPlanner:
