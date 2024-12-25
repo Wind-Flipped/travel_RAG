@@ -1,14 +1,14 @@
 from zhipuai import ZhipuAI
 import sys, os
-# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
+# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./agents")))
 from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
 
 
 
-from rag.component.embedding import Zhipuembedding
-from rag.component.data_chunker import ReadFile
-from rag.component.databases import Vectordatabase
-from rag.component.request import Request
+from agents.rag.component.embedding import Zhipuembedding
+from agents.rag.component.data_chunker import ReadFile
+from agents.rag.component.databases import Vectordatabase
+from agents.rag.component.request import Request
 
 class LLMs:
     def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
@@ -46,10 +46,12 @@ class VectorDatabase:
                  index=-1,
                  model_name = "glm-4-air",
                  rag_database: list[str] = ["/home/wangb/cyo/graduation/rag/databases/hangzhou",
-                                            "/home/wangb/cyo/graduation/rag/databases/hangzhou_poi"]) -> None:
+                                            "/home/wangb/cyo/graduation/rag/databases/hangzhou_poi",
+                                            "/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json"]) -> None:
         # Load vector database and embedding model
         self.db_route = Vectordatabase()
         self.db_route.load_vector(rag_database[0])
+        self.db_route.load_real_route(rag_database[2])
         self.db_poi = Vectordatabase()
         self.db_poi.load_vector(rag_database[1])
         self.embedding_model = Zhipuembedding(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE")
@@ -69,11 +71,16 @@ class VectorDatabase:
         except:
             pos_question, neg_question = query, None
         # pos_question, neg_question = query, None
-        print("__________++++++++++++++++_______________")
         routes = self.db_route.query_both(pos_question, neg_question, self.embedding_model, 4, 1, True, invisible=index)
 
         pois = self.db_poi.query_both(pos_question, neg_question, self.embedding_model, 4, 1,  True, invisible=index)
         return self.query_zh(routes, pois)
+
+    def get_route_info_with_place(self, query: str, place: str, index=-1):
+        routes = self.db_route.query_with_route(query, place, self.embedding_model, 2, 2, True, invisible=index)
+        pois = self.db_poi.query_both(query, None, self.embedding_model, 2, 1, True, invisible=index)
+        return self.query_zh(routes, pois)
+
     def get_related_route_info(self, query: str, index=-1):
         # Use Request to divide query into pos_question and neg_question)
         try:

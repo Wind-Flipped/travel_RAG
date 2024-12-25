@@ -25,10 +25,10 @@ class Planner:
     def __init__(self,
                  # args,
                  model_name: str = 'glm-4-air',
-                 mode = "planner_agent_prompt_zh",
+                 mode = 'zero_shot_reformat_zh',
                  ) -> None:
         self.mode = mode
-        if mode == "planner_agent_prompt_zh":
+        if mode == 'zero_shot_reformat_zh' or 'route_RAG_zh':
             self.agent_prompt = planner_agent_prompt_zh
         elif mode == "zero_shot_zh":
             self.agent_prompt = planner_zero_shot_zh
@@ -47,13 +47,13 @@ class Planner:
 
     def run(self, text, query, route=None) -> str:
         # print(self._build_agent_prompt(text, query))
-        if self.mode == "planner_agent_prompt_zh":
+        if self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
             return str(self.llm(self._build_agent_prompt(text, query, route)))
         elif self.mode == "zero_shot_zh":
             return str(self.llm(self._build_agent_prompt(text, query, route)))
 
     def _build_agent_prompt(self, text, query, route) -> str:
-        if self.mode == "planner_agent_prompt_zh":
+        if self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
             return self.agent_prompt.format(
                 text=text,
                 query=query,

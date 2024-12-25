@@ -65,7 +65,7 @@ class ReactAgent:
             self.agent_prompt = zeroshot_react_agent_prompt
         elif self.mode == 'zero_shot_zh':
             self.agent_prompt = zeroshot_react_agent_prompt_zh
-        elif self.mode == 'zero_shot_reformat_zh':
+        elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
             self.agent_prompt = zeroshot_react_agent_prompt_reformat_zh
 
         self.vector_database = VectorDatabase(model=self.llm.get_model(), model_name=react_llm_name)
@@ -99,7 +99,7 @@ class ReactAgent:
 
         self.__reset_agent()
 
-    def run(self, query, index=-1, reset=True) -> None:
+    def run(self, query, place=None, index=-1, reset=True) -> None:
 
         self.query = query
 
@@ -107,7 +107,11 @@ class ReactAgent:
             self.__reset_agent()
         if self.mode == 'zero_shot_reformat_zh':
             self.route_info, self.poi_info = self.vector_database.get_related_route_info(self.query, index=index)
-
+        elif self.mode == 'route_RAG_zh':
+            match = re.search(r"要求是：(.*?)。", query)
+            if match:
+                query = match.group(1)
+            self.route_info, self.poi_info = self.vector_database.get_route_info_with_place(query, place, index=index)
 
         while not self.is_halted() and not self.is_finished():
             self.step()
@@ -339,7 +343,7 @@ class ReactAgent:
                 if self.mode == 'zero_shot_zh':
                     self.current_observation = str(
                         self.tools["planner"].run(self.scratchpad, query=action_arg, route=None))
-                elif self.mode == 'zero_shot_reformat_zh':
+                elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
                     self.current_observation = str(
                         self.tools["planner"].run(self.scratchpad, query=action_arg, route=self.route_info))
                 self.scratchpad += self.current_observation
@@ -393,7 +397,7 @@ class ReactAgent:
             return self.agent_prompt.format(
                 query=self.query,
                 scratchpad=self.scratchpad)
-        elif self.mode == 'zero_shot_reformat_zh':
+        elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
             return self.agent_prompt.format(
                 query=self.query,
                 route_info=self.route_info,
@@ -548,13 +552,63 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
     parser.add_argument("--dataset", type=str, default="real")
-    parser.add_argument("--mode", type=str, default='zero_shot_zh')
+    parser.add_argument("--mode", type=str, default='route_RAG_zh')
     args = parser.parse_args()
     agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
     start_time = time.time()
 
-    if args.dataset == 'real':
+    if args.mode == 'route_RAG_zh':
+        evaluator = Evaluator(have_truth=True)
+        with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
+                  encoding='utf-8') as f:
+            all_data = json.load(f)
+        requires = all_data
+        print("The total number: " + str(len(requires)))
+
+        for index, item in tqdm(enumerate(requires)):
+            query = item["input"]
+            target_place = item["target_place"][0]
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
+                os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}'))
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')):
+                result = [{}]
+            else:
+                result = json.load(
+                    open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')))
+            try:
+                planner_results, scratchpad, action_log = agent.run(query=query, place=target_place, index=index)
+
+                if planner_results == 'Max Token Length Exceeded.':
+                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                    result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
+                    action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
+                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+                else:
+                    result[-1][f'{args.model_name}_two-stage_query'] = query
+                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                    result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+
+                # write to json file
+                with open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json'), 'w') as f:
+                    json.dump(result, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                print("Error in results")
+                print(e)
+                planner_results = "Error in results"
+                result[-1][f'{args.model_name}_two-stage_query'] = query
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = None
+                result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = None
+            evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
+                                    query=query, truth=item["route"])
+
+        evaluator.print_real_result(args.mode)
+
+
+
+    elif args.dataset == 'real':
         evaluator = Evaluator(have_truth=True)
         with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
                   encoding='utf-8') as f:
