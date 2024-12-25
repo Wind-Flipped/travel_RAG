@@ -11,6 +11,7 @@ from typing import List
 from data_chunker import ReadFile
 from sklearn.cluster import KMeans
 import re
+from ..BM25.bm25 import BM25
 
 
 class Vectordatabase:
@@ -22,6 +23,7 @@ class Vectordatabase:
         self.topic_vectors = []
         self.document = []
         self.real_routes = []
+        self.bm25 = BM25()
 
     # 对字块列表进行，批量的embedded编码，传入embedding模型，返回一个向量列表
     def get_topic_vector(self, EmbeddingModel) -> List[List[float]]:
@@ -72,6 +74,22 @@ class Vectordatabase:
             all_data = json.load(f)
         for item in all_data:
             self.real_routes.append(item["route"])
+
+    def query_with_route_bm25(self, query, place: str, EmbeddingModel, route_top_k: int = 2, bm25_top_k: int = 4, invisible: int = -1):
+        visible_topic_vectors = [vector for idx, vector in enumerate(self.topic_vectors) if idx != invisible]
+        # visible_entire_vectors = [vector for idx, vector in enumerate(self.entire_vectors) if idx != invisible]
+        visible_document = [document for idx, document in enumerate(self.document) if idx != invisible]
+        route_vector = EmbeddingModel.get_embedding(query)
+        bm25_vector = [0] * len(visible_document)
+        bm25_query_result = self.bm25.get_topk_order(f"{query},{place}", k=bm25_top_k, index=invisible)
+        for idx in bm25_query_result:
+            bm25_vector[idx] = 1
+        bm25_vector = np.array(bm25_vector)
+        result = np.array([self.get_similarity(route_vector, vector, EmbeddingModel)
+                           for vector in visible_topic_vectors])
+        result = result + bm25_vector
+
+        return np.array(visible_document)[result.argsort()[-route_top_k:][::-1]].tolist()
 
     def query_with_route(self, query, place: str, EmbeddingModel, k: int = 1, n: int = 3,
                    multi: bool = True, invisible: int = -1) -> \

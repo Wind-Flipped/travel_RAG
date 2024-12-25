@@ -81,6 +81,11 @@ class VectorDatabase:
         pois = self.db_poi.query_both(query, None, self.embedding_model, 2, 1, True, invisible=index)
         return self.query_zh(routes, pois)
 
+    def get_route_info_with_bm25(self, query: str, place: str, index=-1):
+        routes = self.db_route.query_with_route_bm25(query, place, self.embedding_model, 2, 4, invisible=index)
+        pois = self.db_poi.query_both(query, None, self.embedding_model, 2, 1, True, invisible=index)
+        return self.query_zh(routes, pois)
+
     def get_related_route_info(self, query: str, index=-1):
         # Use Request to divide query into pos_question and neg_question)
         try:

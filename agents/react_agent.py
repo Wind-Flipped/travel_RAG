@@ -47,6 +47,7 @@ class ReactAgent:
                  illegal_early_stop_patience: int = 3,
                  react_llm_name='glm-4-air',
                  planner_llm_name='glm-4-air',
+                 planner_mode='zero_shot_reformat_zh',
                  #  logs_path = '../logs/',
                  city_file_path='../database/background/citySet.txt'
                  ) -> None:
@@ -54,6 +55,7 @@ class ReactAgent:
         self.answer = ''
         self.max_steps = max_steps
         self.mode = mode
+        self.planner_mode = planner_mode
 
         if 'glm-4' in react_llm_name:
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
@@ -65,7 +67,7 @@ class ReactAgent:
             self.agent_prompt = zeroshot_react_agent_prompt
         elif self.mode == 'zero_shot_zh':
             self.agent_prompt = zeroshot_react_agent_prompt_zh
-        elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
+        elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
             self.agent_prompt = zeroshot_react_agent_prompt_reformat_zh
 
         self.vector_database = VectorDatabase(model=self.llm.get_model(), model_name=react_llm_name)
@@ -112,6 +114,11 @@ class ReactAgent:
             if match:
                 query = match.group(1)
             self.route_info, self.poi_info = self.vector_database.get_route_info_with_place(query, place, index=index)
+        elif self.mode == 'route_bm25_RAG_zh':
+            match = re.search(r"要求是：(.*?)。", query)
+            if match:
+                query = match.group(1)
+            self.route_info, self.poi_info = self.vector_database.get_route_info_with_bm25(query=query, place=place, index=index)
 
         while not self.is_halted() and not self.is_finished():
             self.step()
@@ -343,7 +350,7 @@ class ReactAgent:
                 if self.mode == 'zero_shot_zh':
                     self.current_observation = str(
                         self.tools["planner"].run(self.scratchpad, query=action_arg, route=None))
-                elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
+                elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
                     self.current_observation = str(
                         self.tools["planner"].run(self.scratchpad, query=action_arg, route=self.route_info))
                 self.scratchpad += self.current_observation
@@ -397,7 +404,7 @@ class ReactAgent:
             return self.agent_prompt.format(
                 query=self.query,
                 scratchpad=self.scratchpad)
-        elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
+        elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
             return self.agent_prompt.format(
                 query=self.query,
                 route_info=self.route_info,
@@ -440,7 +447,7 @@ class ReactAgent:
             elif tool_name == 'notebook':
                 tools_map[tool_name] = Notebook()
             elif tool_name == 'planner':
-                tools_map[tool_name] = Planner(self.planner_name, mode=self.mode)
+                tools_map[tool_name] = Planner(self.planner_name, mode=self.planner_mode)
             elif tool_name == 'attraction_retrieval':
                 tools_map[tool_name] = self.vector_database
         return tools_map
@@ -552,13 +559,13 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
     parser.add_argument("--dataset", type=str, default="real")
-    parser.add_argument("--mode", type=str, default='route_RAG_zh')
+    parser.add_argument("--mode", type=str, default='route_bm25_RAG_zh')
     args = parser.parse_args()
     agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
     start_time = time.time()
 
-    if args.mode == 'route_RAG_zh':
+    if args.mode == 'route_RAG_zh' or args.mode == 'route_bm25_RAG_zh':
         evaluator = Evaluator(have_truth=True)
         with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
                   encoding='utf-8') as f:
@@ -567,6 +574,8 @@ if __name__ == '__main__':
         print("The total number: " + str(len(requires)))
 
         for index, item in tqdm(enumerate(requires)):
+            if index > 2:
+                break
             query = item["input"]
             target_place = item["target_place"][0]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
