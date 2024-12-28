@@ -31,6 +31,7 @@ class Evaluator:
         self.attraction_num = 0
         self.restaurant_num = 0
         self.budget_num = 0
+        self.distance_num = 0
         self.all_num = 0
 
         self.avg_distance = 0
@@ -60,6 +61,7 @@ class Evaluator:
 
 
     def generate_request(self, number : int = 50):
+        base_request = []
         while number > 0:
             number -= 1
             restaurant_name = self.restaurant.get_one_type()
@@ -70,13 +72,15 @@ class Evaluator:
             want_restaurant = "" if random_number2 > 0.5 else "不"
             people = random.randint(1,6)
             budget = people * random.randint(150,300)
-            query = self.generate_query(want_restaurant, want_attraction, restaurant_name, attraction_name, people, budget)
+            distance = random.randint(5, 30)
+            query = self.generate_query(want_restaurant, want_attraction, restaurant_name, attraction_name, people, budget, distance)
             self.queries.append(query)
-            self.answers.append({"want_restaurant": want_restaurant, "want_attraction": want_attraction, "restaurant_name": restaurant_name, "attraction_name": attraction_name, "people": people, "budget": budget})
+            self.answers.append({"want_restaurant": want_restaurant, "want_attraction": want_attraction, "restaurant_name": restaurant_name, "attraction_name": attraction_name, "people": people, "budget": budget, "distance": distance})
             print(f'旅游路线：{query}')
+            base_request.append(query)
         return self.queries
-    def generate_query(self, want_restaurant, want_attraction, restaurant_name, attraction_name, people, budget):
-        return f"请帮我规划一条在杭州的一日旅游路线，{want_attraction}想要去{attraction_name}游玩，{want_restaurant}想要吃{restaurant_name}类型的美食，一共有{people}个人，总共预算需要在{budget}元以内。"
+    def generate_query(self, want_restaurant, want_attraction, restaurant_name, attraction_name, people, budget, distance):
+        return f"请帮我规划一条在杭州的一日旅游路线，{want_attraction}想要去{attraction_name}游玩，{want_restaurant}想要吃{restaurant_name}类型的美食，按照顺序参观不同景点之间的交通距离之和不要超过{distance}km，一共有{people}个人，总共预算需要在{budget}元以内。"
 
     def evaluate_baseline(self, agent_output, target_place, query, truth):
         self.eval_log.append({"step": self.step, "normal": False,
@@ -158,7 +162,8 @@ class Evaluator:
 
     def evaluate_real(self, agent_output, target_place, query, truth):
         self.eval_log.append({"step": self.step, "normal": False,
-                              "complete": False, "attraction": False, "restaurant": False, "budget": False,
+                              "complete": False, "attraction": False,
+                              "restaurant": False, "budget": False,
                               "avg_distance": 0, "avg_score": 0,
                               "jaccard_similarity": 0, "exact_match_similarity": 0, "center_distance": 0,
                               "distance_similarity": 0, "request2route": 0, "popularity_similarity": 0})
@@ -199,12 +204,18 @@ class Evaluator:
                 else:
                     all_flag = False
 
+                # if self.valid_attraction and self.eval_distance(attraction_list, answer):
+                #     self.eval_log[-1]["distance"] = True
+                #     self.attraction_num += 1
+                # else:
+                #     all_flag = False
+                #
                 # if self.valid_restaurant and self.eval_restaurant(answer, lunch, dinner):
                 #     self.eval_log[-1]["restaurant"] = True
                 #     self.restaurant_num += 1
                 # else:
                 #     all_flag = False
-
+                #
                 # if self.eval_budget(answer, lunch, dinner):
                 #     self.eval_log[-1]["budget"] = True
                 #     self.budget_num += 1
@@ -277,12 +288,17 @@ class Evaluator:
             json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
 
 
-    def evaluate(self, agent_output):
+    def evaluate(self, agent_output, externel_data=None):
         self.eval_log.append({"step": self.step, "normal": False,
                               "complete": False, "attraction": False, "restaurant": False, "budget": False,
+                              "distance": False,
                               "avg_distance": 0, "avg_score": 0})
-        answer = self.answers[self.step]
-        query = self.queries[self.step]
+        if externel_data:
+            answer = externel_data
+            query = externel_data["query"]
+        else:
+            answer = self.answers[self.step]
+            query = self.queries[self.step]
         self.step += 1
         all_flag = True
         self.valid_restaurant = True
@@ -309,13 +325,19 @@ class Evaluator:
                 if self.eval_complete(attraction_list, lunch, dinner):
                     self.eval_log[-1]["complete"] = True
                     self.complete_num += 1
-                    self.eval_distance(attraction_list)
+                    # self.eval_distance(attraction_list)
                 else:
                     all_flag = False
 
                 if self.valid_attraction and self.eval_attraction(answer, attraction_list):
                     self.eval_log[-1]["attraction"] = True
                     self.attraction_num += 1
+                else:
+                    all_flag = False
+
+                if self.valid_attraction and self.eval_distance(attraction_list, answer):
+                    self.eval_log[-1]["distance"] = True
+                    self.distance_num += 1
                 else:
                     all_flag = False
 
@@ -332,7 +354,7 @@ class Evaluator:
                     all_flag = False
 
                 self.all_num += 1 if all_flag else 0
-                self.calculate_ai_similarity(attraction_list, query)
+                # self.calculate_ai_similarity(attraction_list, query)
             else:
                 print("output wrong json")
         except Exception as e:
@@ -353,7 +375,7 @@ class Evaluator:
             return False
         return True
 
-    def eval_distance(self, attraction_list):
+    def eval_distance(self, attraction_list, answer=None):
         try:
             length = len(attraction_list)
             sum_distance = 0
@@ -365,9 +387,12 @@ class Evaluator:
             self.avg_distance += sum_distance / length
             self.valid_distance += 1
             self.eval_log[-1]["avg_distance"] = sum_distance / length
+            if answer:
+                return True if sum_distance <= answer["distance"] else False
         except Exception as e:
             print(e)
             print("eval_distance error")
+            return False
 
     def eval_attraction(self, answer, attraction_list):
         if answer["want_attraction"] == '':
@@ -393,10 +418,11 @@ class Evaluator:
 
         return (extracted_price1 + extracted_price2) * people <= budget
 
-    def print_result(self):
+    def print_result(self, mode):
         print(f"normal: {self.normal_num}")
         print(f"complete: {self.complete_num}")
         print(f"attraction: {self.attraction_num}")
+        print(f"distance: {self.distance_num}")
         print(f"restaurant: {self.restaurant_num}")
         print(f"budget: {self.budget_num}")
         print(f"all: {self.all_num}")
@@ -406,11 +432,14 @@ class Evaluator:
 
 
         self.eval_log.append({"normal": self.normal_num, "complete": self.complete_num, "attraction": self.attraction_num,
+                              "distance": self.distance_num,
                               "restaurant": self.restaurant_num, "budget": self.budget_num, "all": self.all_num,
                               "avg_distance": self.avg_distance / self.valid_distance if self.valid_distance > 0 else None,
                               "avg_score": self.avg_score / self.valid_score if self.valid_score > 0 else None})
         # save the results
-        with open(os.path.join(f'./logs/eval.json'), 'w') as f:
+        if not os.path.exists(f'./testlogs/'):
+            os.makedirs(f'./testlogs/')
+        with open(os.path.join(f'./testlogs/{mode}_eval.json'), 'w') as f:
             json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
 
 

@@ -45,9 +45,9 @@ class VectorDatabase:
     def __init__(self, model = ZhipuAI(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE"),
                  index=-1,
                  model_name = "glm-4-air",
-                 rag_database: list[str] = ["/home/wangb/cyo/graduation/rag/databases/hangzhou",
-                                            "/home/wangb/cyo/graduation/rag/databases/hangzhou_poi",
-                                            "/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json"]) -> None:
+                 rag_database: list[str] = ["rag/databases/hangzhou",
+                                            "rag/databases/hangzhou_poi",
+                                            "rag/databases/hangzhou/key_place2_requests.json"]) -> None:
         # Load vector database and embedding model
         self.db_route = Vectordatabase()
         self.db_route.load_vector(rag_database[0])

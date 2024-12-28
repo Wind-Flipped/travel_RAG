@@ -47,9 +47,9 @@ class BM25Param(object):
 
 
 class BM25(object):
-    _param_pkl = "/home/wangb/cyo/graduation/agents/rag/BM25/data/param.pkl"
-    _docs_path = "/home/wangb/cyo/graduation/agents/rag/BM25/data/data.txt"
-    _stop_words_path = "/home/wangb/cyo/graduation/agents/rag/BM25/data/stop_words.txt"
+    _param_pkl = "C:\\代码\\travel_RAG\\agents\\rag\\BM25\\data\\param.pkl"
+    _docs_path = "C:\\代码\\travel_RAG\\agents\\rag\\BM25\\data\\data.txt"
+    _stop_words_path = "C:\\代码\\travel_RAG\\agents\\rag\\BM25\\data\\stop_words.txt"
     _stop_words = []
 
     def __init__(self, docs=""):
@@ -195,22 +195,23 @@ class BM25(object):
 
 
 if __name__ == '__main__':
-    # bm25 = BM25()
+    bm25 = BM25()
     query = "治愈，徒步，自然风光，山林吸氧，爬山"
     place = "九溪入口"
     # top_k_index = bm25.get_topk_order(query, k=4, index=3)
-    bm25_vector = [0] * 123
-    bm25_query_result = [23,53,102,2]
-    for idx in bm25_query_result:
-        bm25_vector[idx] = 1
-    import numpy as np
-    bm25_vector = np.array(bm25_vector)
-    print(bm25_vector)
-    # result = bm25.cal_similarity(query_content)
-    # bm25_score = []
-    # for line, score in result:
-    #     bm25_score.append(score)
-    #     print(line, score)
+    # bm25_vector = [0] * 123
+    # bm25_query_result = [23,53,102,2]
+    # for idx in bm25_query_result:
+    #     bm25_vector[idx] = 1
+    # import numpy as np
+    # bm25_vector = np.array(bm25_vector)
+    # print(bm25_vector)
+    query_content = "治愈，徒步，自然风光，山林吸氧，爬山"
+    result = bm25.cal_similarity(query_content)
+    bm25_score = []
+    for line, score in result:
+        bm25_score.append(score)
+        print(line, score)
 
     # print("**"*20)
     #

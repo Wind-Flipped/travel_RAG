@@ -558,9 +558,10 @@ if __name__ == '__main__':
     parser.add_argument("--set_type", type=str, default="test")
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
-    parser.add_argument("--dataset", type=str, default="real")
-    parser.add_argument("--mode", type=str, default='route_bm25_RAG_zh')
+    parser.add_argument("--dataset", type=str, default="fake")
+    parser.add_argument("--mode", type=str, default='zero_shot_zh')
     args = parser.parse_args()
+    print(args)
     agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name)
     start_time = time.time()
@@ -574,8 +575,6 @@ if __name__ == '__main__':
         print("The total number: " + str(len(requires)))
 
         for index, item in tqdm(enumerate(requires)):
-            if index > 2:
-                break
             query = item["input"]
             target_place = item["target_place"][0]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
@@ -663,21 +662,26 @@ if __name__ == '__main__':
         evaluator.print_real_result(args.mode)
 
     else:
-        number = 1
         evaluator = Evaluator()
-        queries = evaluator.generate_request(number=number)
+        print("The total number: 3")
+        with open(f"data/base_request.json", 'r', encoding='utf-8') as f:
+            all_data = json.load(f)
+
         step = 1
-        for query in tqdm(queries):
+        for data in tqdm(all_data):
+            if step > 3:
+                break
+            query = data["query"]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}')):
                 os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}'))
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{number}.json')):
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{step}.json')):
                 result = [{}]
             else:
                 result = json.load(
-                    open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{number}.json')))
+                    open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{step}.json')))
 
 
-            planner_results, scratchpad, action_log = agent.run(query)
+            planner_results, scratchpad, action_log = agent.run(query=query)
 
 
             if planner_results == 'Max Token Length Exceeded.':
@@ -697,9 +701,9 @@ if __name__ == '__main__':
 
             step += 1
 
-            evaluator.evaluate(agent_output=planner_results)
+            evaluator.evaluate(agent_output=planner_results, externel_data=data)
 
-        evaluator.print_result()
+        evaluator.print_result(args.mode)
     end_time = time.time()
 
     print(f"Time taken: {end_time - start_time} seconds")
