@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 import importlib
 from typing import List, Dict, Any
 from pandas import DataFrame
-from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
+from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh, reflection_zh
 import sys
 import json
 import time
@@ -69,6 +69,8 @@ class ReactAgent:
             self.agent_prompt = zeroshot_react_agent_prompt_zh
         elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
             self.agent_prompt = zeroshot_react_agent_prompt_reformat_zh
+        elif self.mode == 'reflection_zh':
+            self.agent_prompt = reflection_zh
 
         self.vector_database = VectorDatabase(model=self.llm.get_model(), model_name=react_llm_name)
         self.react_name = react_llm_name
@@ -133,8 +135,8 @@ class ReactAgent:
         # self.scratchpad += f'\nThought {self.step_n}:'
         generate_text = self.prompt_agent()
         try:
-            thought = re.search(r'Thought [\d+]: ([^A。.]+)', generate_text).group(1)
-            action = re.search(r"Action [\d+]: (.*?\[.*?\])", generate_text).group(1)
+            thought = re.search(r'Thought[\s\d]*: ([^A。.]+)', generate_text).group(1)
+            action = re.search(r"Action[\s\d]*: (.*?\[.*?\])", generate_text).group(1)
         except:
             self.retry_record['invalidAction'] += 1
             print(f'Invalid Thought or Action: {generate_text}')
@@ -347,16 +349,32 @@ class ReactAgent:
 
             elif action_type == "Planner":
                 # try:
-                if self.mode == 'zero_shot_zh':
+                if self.mode == 'zero_shot_zh' or self.mode == 'reflection_zh':
                     self.current_observation = str(
                         self.tools["planner"].run(self.scratchpad, query=action_arg, route=None))
                 elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
                     self.current_observation = str(
                         self.tools["planner"].run(self.scratchpad, query=action_arg, route=self.route_info))
-                self.scratchpad += self.current_observation
-                self.answer = self.current_observation
-                self.__reset_record()
-                self.json_log[-1]['state'] = f'Successful'
+                if self.mode == 'reflection_zh':
+                    match = re.search(r'(\{.*\})', self.current_observation, re.DOTALL)
+                    if match:
+                        extracted_json = match.group(1)
+                        data = json.loads(extracted_json)
+                        if data["评价"] == "Fail":
+                            action_type = None
+                            self.scratchpad += data["理由"]
+                            self.answer = data["理由"]
+                            self.json_log[-1]['state'] = f'Retry planning'
+                        else:
+                            self.scratchpad += self.current_observation
+                            self.answer = self.current_observation
+                            self.__reset_record()
+                            self.json_log[-1]['state'] = f'Successful'
+                else:
+                    self.scratchpad += self.current_observation
+                    self.answer = self.current_observation
+                    self.__reset_record()
+                    self.json_log[-1]['state'] = f'Successful'
 
             else:
                 self.retry_record['invalidAction'] += 1
@@ -400,7 +418,7 @@ class ReactAgent:
                 return "Error !"
 
     def _build_agent_prompt(self) -> str:
-        if self.mode == 'zero_shot_zh':
+        if self.mode == 'zero_shot_zh' or self.mode == 'reflection_zh':
             return self.agent_prompt.format(
                 query=self.query,
                 scratchpad=self.scratchpad)
@@ -559,11 +577,11 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
     parser.add_argument("--dataset", type=str, default="fake")
-    parser.add_argument("--mode", type=str, default='zero_shot_zh')
+    parser.add_argument("--mode", type=str, default='reflection_zh')
     args = parser.parse_args()
     print(args)
-    agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
-                       planner_llm_name=args.model_name)
+    agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=15, react_llm_name=args.model_name,
+                       planner_llm_name=args.model_name, planner_mode=args.mode)
     start_time = time.time()
 
     if args.mode == 'route_RAG_zh' or args.mode == 'route_bm25_RAG_zh':
@@ -669,8 +687,6 @@ if __name__ == '__main__':
 
         step = 1
         for data in tqdm(all_data):
-            if step > 3:
-                break
             query = data["query"]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}')):
                 os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}'))

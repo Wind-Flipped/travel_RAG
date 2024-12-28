@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
-from agents.prompts import planner_agent_prompt, planner_agent_prompt_zh, planner_zero_shot_zh
+from agents.prompts import planner_agent_prompt, planner_agent_prompt_zh, planner_zero_shot_zh, planner_reflection_zh
 # from env import ReactEnv,ReactReflectEnv
 
 import re
@@ -9,11 +9,40 @@ import time
 from enum import Enum
 from typing import List, Union, Literal
 import argparse
+# from zhipuai import ZhipuAI
 from agents.llms import LLMs
 
 # OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 
-
+# class LLMs:
+#     def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
+#                  api_key = "c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE",
+#                  rag_database: str = "/home/wangb/cyo/graduation/rag/databases/hangzhou") -> None:
+#         # 初始化大模型
+#         self.model_name = model_name
+#         self.temperature = temperature
+#         self.model = ZhipuAI(api_key=api_key)
+#
+#         # 加载向量数据库，embedding模型
+#         # self.db = Vectordatabase(api_key=api_key)
+#         # self.db.load_vector(rag_database)
+#         # self.embedding_model = Zhipuembedding()
+#
+#     # 定义chat方法
+#     def __call__(self, prompt: str, stop: list = None):
+#         response = self.model.chat.completions.create(
+#             model=self.model_name,
+#             stop = stop,
+#             messages=[
+#                 {"role": "user", "content": prompt},
+#             ]
+#         )
+#
+#         return response.choices[0].message.content
+#
+#
+#     def get_model(self):
+#         return self.model
 class ReflexionStrategy(Enum):
     """
     REFLEXION: Apply reflexion to the next reasoning trace 
@@ -28,10 +57,12 @@ class Planner:
                  mode = 'zero_shot_reformat_zh',
                  ) -> None:
         self.mode = mode
-        if mode == 'zero_shot_reformat_zh' or 'route_RAG_zh':
+        if mode == 'zero_shot_reformat_zh' or mode == 'route_RAG_zh':
             self.agent_prompt = planner_agent_prompt_zh
         elif mode == "zero_shot_zh":
             self.agent_prompt = planner_zero_shot_zh
+        elif mode == "reflection_zh":
+            self.agent_prompt = planner_reflection_zh
 
         self.scratchpad: str = ''
         self.model_name = model_name
@@ -49,7 +80,7 @@ class Planner:
         # print(self._build_agent_prompt(text, query))
         if self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
             return str(self.llm(self._build_agent_prompt(text, query, route)))
-        elif self.mode == "zero_shot_zh":
+        elif self.mode == "zero_shot_zh" or self.mode == "reflection_zh":
             return str(self.llm(self._build_agent_prompt(text, query, route)))
 
     def _build_agent_prompt(self, text, query, route) -> str:
@@ -58,10 +89,10 @@ class Planner:
                 text=text,
                 query=query,
                 route=route)
-        elif self.mode == "zero_shot_zh":
+        elif self.mode == "zero_shot_zh" or self.mode == "reflection_zh":
             return self.agent_prompt.format(
                 text=text,
-                query=query,)
+                query=query)
 
 '''
 class ReactPlanner:
@@ -346,5 +377,9 @@ def format_reflections(reflections: List[str],
     else:
         return header + 'Reflections:\n- ' + '\n- '.join([r.strip() for r in reflections])
 '''
-# if __name__ == '__main__':
-    
+if __name__ == '__main__':
+    planner = Planner(model_name='glm-4-air', mode='reflection_zh')
+    text = "杭州有西湖、灵隐寺、千岛湖等景点，绿茶餐厅人均50元，肯德基人均40元，海底捞火锅人均100元，巴西烤肉人均70元，胜发饺子人均30元，西湖到灵隐寺的距离为6km，灵隐寺到千岛湖的距离为7km"
+    query = "我想去杭州一日游，想要去西湖，总共有4个人，预算480元，交通距离不超过12km"
+    result = planner.run(text, query)
+    print(result)
