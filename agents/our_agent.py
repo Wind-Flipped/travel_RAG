@@ -1,44 +1,173 @@
 import re, string, os, sys
 
-# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..")))
-# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "tools/planner")))
-# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../tools/planner")))
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
-# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "tools")))
-# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "tools/notebook")))
-# os.chdir(os.path.dirname(os.path.abspath(__file__)))
-import importlib
 from typing import List, Dict, Any
 from pandas import DataFrame
-from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh, reflection_zh
-import sys
+from our_prompt import planner_instruction, solver_instruction, trimmer_instruction
 import json
-import time
-import pandas as pd
-from datetime import datetime
 from tqdm import tqdm
 import argparse
 import os
 from llms import LLMs, VectorDatabase
 import tools.apis as apis
 from tools.notebook.apis import Notebook
-from tools.planner.apis import Planner
 from evaluate import Evaluator
 import time
 
 # OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 
 
-pd.options.display.max_info_columns = 200
+# pd.options.display.max_info_columns = 200
 
 os.environ['TIKTOKEN_CACHE_DIR'] = './tmp'
 
 actionMapping = {'RestaurantInfo':'restaurant_info', 'AttractionInfo':'attraction_info',
                  'RestaurantDistance':'restaurant_distance', 'AttractionDistance':'attraction_distance',
                  'RestaurantSearch': 'restaurant_search', 'AttractionSearch':'attraction_search',
-                 'Notebook':'notebook','Planner':'planner', 'AttractionRetrieval': 'attraction_retrieval'}
+                 'Notebook':'notebook','Planner':'planner', 'AttractionRetrieval': 'attraction_retrieval',
+                 'Finish':'finish'}
 
-class ReactAgent:
+class Planner:
+    def __init__(self,
+                 mode: str = 'zero_shot_reformat_zh',
+                 llm_name='glm-4-air'
+                 ):
+        self.mode = mode
+        self.llm_name = llm_name
+        self.llm = LLMs(model_name=llm_name)
+        self.result = ''
+        if mode == 'our':
+            self.agent_prompt = planner_instruction
+
+    def __reset_agent(self) -> None:
+        self.step_n = 1
+        self.finished = False
+        self.answer = ''
+        self.query = ''
+
+    def run(self, query, reset=True):
+        if reset:
+            self.__reset_agent()
+        self.query = query
+        result = self.prompt_agent()
+
+        return result
+
+    def prompt_agent(self) -> str:
+        while True:
+            try:
+                # print(self._build_agent_prompt())
+                if 'glm-4' in self.llm_name:
+                    request = format_step(self.llm(self._build_agent_prompt()))
+                else:
+                    # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
+                    request = " "
+                # print(request)
+                return request
+            except:
+                print("Error !")
+                return "Error !"
+
+    def _build_agent_prompt(self) -> str:
+        if self.mode == 'our':
+            return self.agent_prompt.format(
+                query=self.query)
+
+class Trimmer():
+    def __init__(self,
+                 mode: str = 'zero_shot_reformat_zh',
+                 llm_name='glm-4-air',
+                 solver_agent=None,
+                 max_step=3
+                 ):
+        self.mode = mode
+        self.llm_name = llm_name
+        self.llm = LLMs(model_name=llm_name)
+        self.result = ''
+        self.finished = False
+        self.json_log = [{}]
+        self.solver = solver_agent
+        self.step_n = 1
+        self.max_step = max_step
+        if mode == 'our':
+            self.agent_prompt = trimmer_instruction
+
+    def __reset_agent(self) -> None:
+        self.step_n = 1
+        self.finished = False
+        self.answer = ''
+        self.query = ''
+        self.result = ''
+        self.json_log = [{}]
+
+    def run(self, query, tasks: list, plans: list, reset=True):
+        if reset:
+            self.__reset_agent()
+        self.query = query
+        self.tasks = tasks
+        self.plans = plans
+        self.task_str = ''
+        self.plan_str = ''
+        for task in tasks:
+            self.task_str += task + '\n'
+        for plan in plans:
+            self.plan_str += plan + '\n'
+
+        result = {}
+        while not self.finished and self.step_n <= self.max_step:
+            result = self.step()
+
+        return result, self.json_log
+
+    def step(self):
+        result = self.prompt_agent()
+        match = re.search(r'(\{.*\})', result, re.DOTALL)
+        if match:
+            extracted_json = match.group(1)
+            data = json.loads(extracted_json)
+            tag = data["评价"]
+            if tag == 'Success':
+                self.finished = True
+                print(result)
+                return result
+            else:
+                sub_task = data["查询"]
+                print(sub_task)
+                self.tasks.append(sub_task)
+                solver_result, scratchpad, action_log = self.solver.run(query=sub_task)
+                self.json_log[-1][f'{args.model_name}_subtask_{self.step_n}'] = sub_task
+                self.json_log[-1][f'{args.model_name}_results_logs_{self.step_n}'] = scratchpad
+                self.json_log[-1][f'{args.model_name}_results_{self.step_n}'] = solver_result
+                self.json_log[-1][f'{args.model_name}_action_logs_{self.step_n}'] = action_log
+                self.json_log.append({})
+                self.step_n += 1
+                return {}
+
+
+
+    def prompt_agent(self) -> str:
+        while True:
+            try:
+                # print(self._build_agent_prompt())
+                if 'glm-4' in self.llm_name:
+                    request = format_step(self.llm(self._build_agent_prompt()))
+                else:
+                    # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
+                    request = " "
+                # print(request)
+                return request
+            except:
+                print("Error !")
+                return "Error !"
+
+    def _build_agent_prompt(self) -> str:
+        if self.mode == 'our':
+            return self.agent_prompt.format(
+                query=self.query,
+                task=self.task_str,
+                plan=self.plan_str)
+
+class Solver:
     def __init__(self,
                  mode: str = 'zero_shot_reformat_zh',
                  tools: List[str] = None,
@@ -46,8 +175,6 @@ class ReactAgent:
                  max_retries: int = 3,
                  illegal_early_stop_patience: int = 3,
                  react_llm_name='glm-4-air',
-                 planner_llm_name='glm-4-air',
-                 planner_mode='zero_shot_reformat_zh',
                  #  logs_path = '../logs/',
                  city_file_path='../database/background/citySet.txt'
                  ) -> None:
@@ -55,7 +182,6 @@ class ReactAgent:
         self.answer = ''
         self.max_steps = max_steps
         self.mode = mode
-        self.planner_mode = planner_mode
 
         if 'glm-4' in react_llm_name:
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
@@ -63,19 +189,12 @@ class ReactAgent:
             print("LLM's name is getting wrong")
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
-        if self.mode == 'zero_shot':
-            self.agent_prompt = zeroshot_react_agent_prompt
-        elif self.mode == 'zero_shot_zh':
-            self.agent_prompt = zeroshot_react_agent_prompt_zh
-        elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
-            self.agent_prompt = zeroshot_react_agent_prompt_reformat_zh
-        elif self.mode == 'reflection_zh':
-            self.agent_prompt = reflection_zh
+        if self.mode == 'our':
+            self.agent_prompt = solver_instruction
+
 
         self.vector_database = VectorDatabase(model=self.llm.get_model(), model_name=react_llm_name)
         self.react_name = react_llm_name
-        self.planner_name = planner_llm_name
-
         self.json_log = []
 
         self.current_observation = ''
@@ -103,24 +222,12 @@ class ReactAgent:
 
         self.__reset_agent()
 
-    def run(self, query, place=None, index=-1, reset=True) -> None:
+    def run(self, query, reset=True) -> None:
 
         self.query = query
 
         if reset:
             self.__reset_agent()
-        if self.mode == 'zero_shot_reformat_zh':
-            self.route_info, self.poi_info = self.vector_database.get_related_route_info(self.query, index=index)
-        elif self.mode == 'route_RAG_zh':
-            match = re.search(r"要求是：(.*?)。", query)
-            if match:
-                query = match.group(1)
-            self.route_info, self.poi_info = self.vector_database.get_route_info_with_place(query, place, index=index)
-        elif self.mode == 'route_bm25_RAG_zh':
-            match = re.search(r"要求是：(.*?)。", query)
-            if match:
-                query = match.group(1)
-            self.route_info, self.poi_info = self.vector_database.get_route_info_with_bm25(query=query, place=place, index=index)
 
         while not self.is_halted() and not self.is_finished():
             self.step()
@@ -141,7 +248,7 @@ class ReactAgent:
             self.retry_record['invalidAction'] += 1
             print(f'Invalid Thought or Action: {generate_text}')
             self.json_log[-1]["Thought"] = generate_text
-            self.current_observation = '您生成了一条非法指令，请检查您的指令是否正确，需要重新以“Thought”、“Action”的指令格式生成接下来的规划与行动，已经搜集完足够信息后，请调用Planner工具得到最终的路线规划。'
+            self.current_observation = '您生成了一条非法指令，请检查您的指令是否正确，需要重新以“Thought”、“Action”的指令格式生成接下来的规划与行动，已经搜集完足够信息后，请调用Finish工具返回最终的路线规划。'
             self.scratchpad += self.current_observation
             self.json_log[-1]['state'] = f'invalidAction'
             self.step_n += 1
@@ -197,7 +304,7 @@ class ReactAgent:
         else:
             action_type, action_arg = parse_action(action)
 
-            if action_type != "Planner":
+            if action_type != "Finish":
                 if action_type in actionMapping:
                     pending_action = actionMapping[action_type]
                 else:
@@ -205,7 +312,7 @@ class ReactAgent:
 
                 if pending_action in self.retry_record:
                     if self.retry_record[pending_action] + 1 > self.max_retries:
-                        action_type = 'Planner'
+                        action_type = "Finish"
                         print(f"{pending_action} early stop due to {self.max_retries} max retries.")
                         # self.log_file.write(f"{pending_action} early stop due to {self.max_retries} max retries.")
                         self.json_log[-1]['state'] = f"{pending_action} early stop due to {self.max_retries} max retries."
@@ -214,7 +321,7 @@ class ReactAgent:
 
                 elif pending_action not in self.retry_record:
                     if self.retry_record['invalidAction'] + 1 > self.max_retries:
-                        action_type = 'Planner'
+                        action_type = "Finish"
                         print(f"invalidAction Early stop due to {self.max_retries} max retries.")
                         # self.log_file.write(f"invalidAction early stop due to {self.max_retries} max retries.")
                         self.json_log[-1]['state'] = f"invalidAction early stop due to {self.max_retries} max retries."
@@ -347,34 +454,12 @@ class ReactAgent:
                 except Exception as e:
                     print(e)
 
-            elif action_type == "Planner":
+            elif action_type == "Finish":
                 # try:
-                if self.mode == 'zero_shot_zh' or self.mode == 'reflection_zh':
-                    self.current_observation = str(
-                        self.tools["planner"].run(self.scratchpad, query=action_arg, route=None))
-                elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
-                    self.current_observation = str(
-                        self.tools["planner"].run(self.scratchpad, query=action_arg, route=self.route_info))
-                if self.mode == 'reflection_zh':
-                    match = re.search(r'(\{.*\})', self.current_observation, re.DOTALL)
-                    if match:
-                        extracted_json = match.group(1)
-                        data = json.loads(extracted_json)
-                        if data["评价"] == "Fail":
-                            action_type = None
-                            self.scratchpad += data["理由"]
-                            self.answer = data["理由"]
-                            self.json_log[-1]['state'] = f'Retry planning'
-                        else:
-                            self.scratchpad += self.current_observation
-                            self.answer = self.current_observation
-                            self.__reset_record()
-                            self.json_log[-1]['state'] = f'Successful'
-                else:
-                    self.scratchpad += self.current_observation
-                    self.answer = self.current_observation
-                    self.__reset_record()
-                    self.json_log[-1]['state'] = f'Successful'
+                self.finished = True
+                self.current_observation = action_arg
+                self.answer = self.current_observation
+                self.json_log[-1]['state'] = f'Successful'
 
             else:
                 self.retry_record['invalidAction'] += 1
@@ -395,7 +480,7 @@ class ReactAgent:
         self.step_n += 1
 
 
-        if action_type and action_type == 'Planner' and self.retry_record['planner'] == 0:
+        if action_type and action_type == "Finish":
             self.finished = True
             self.answer = self.current_observation
             self.step_n += 1
@@ -418,14 +503,9 @@ class ReactAgent:
                 return "Error !"
 
     def _build_agent_prompt(self) -> str:
-        if self.mode == 'zero_shot_zh' or self.mode == 'reflection_zh':
+        if self.mode == 'our':
             return self.agent_prompt.format(
                 query=self.query,
-                scratchpad=self.scratchpad)
-        elif self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
-            return self.agent_prompt.format(
-                query=self.query,
-                route_info=self.route_info,
                 scratchpad=self.scratchpad)
 
     def is_finished(self) -> bool:
@@ -464,22 +544,10 @@ class ReactAgent:
                 tools_map[tool_name] = apis.Attractions()
             elif tool_name == 'notebook':
                 tools_map[tool_name] = Notebook()
-            elif tool_name == 'planner':
-                tools_map[tool_name] = Planner(self.planner_name, mode=self.planner_mode)
             elif tool_name == 'attraction_retrieval':
                 tools_map[tool_name] = self.vector_database
         return tools_map
 
-    def load_city(self, city_set_path: str) -> List[str]:
-        city_set = []
-        lines = open(city_set_path, 'r').read().strip().split('\n')
-        for unit in lines:
-            city_set.append(unit)
-        return city_set
-
-
-### String Stuff ###
-# gpt2_enc = tiktoken.encoding_for_model("text-davinci-003")
 
 
 def parse_action(string):
@@ -502,61 +570,6 @@ def parse_action(string):
 def format_step(step: str) -> str:
     return step.strip('\n').strip().replace('\n', '')
 
-def normalize_answer(s):
-    def remove_articles(text):
-        return re.sub(r"\b(a|an|the|usd)\b", " ", text)
-
-    def white_space_fix(text):
-        return " ".join(text.split())
-
-    def remove_punc(text):
-        exclude = set(string.punctuation)
-        return "".join(ch for ch in text if ch not in exclude)
-
-    def lower(text):
-        return text.lower()
-
-    return white_space_fix(remove_articles(remove_punc(lower(s))))
-
-
-def parse_args_string(s: str) -> dict:
-    # Split the string by commas
-    segments = s.split(",")
-
-    # Initialize an empty dictionary to store the results
-    result = {}
-
-    for segment in segments:
-        # Check for various operators
-        if "contains" in segment:
-            if "~contains" in segment:
-                key, value = segment.split("~contains")
-                operator = "~contains"
-            else:
-                key, value = segment.split("contains")
-                operator = "contains"
-        elif "<=" in segment:
-            key, value = segment.split("<=")
-            operator = "<="
-        elif ">=" in segment:
-            key, value = segment.split(">=")
-            operator = ">="
-        elif "=" in segment:
-            key, value = segment.split("=")
-            operator = "="
-        else:
-            continue  # If no recognized operator is found, skip to the next segment
-
-        # Strip spaces and single quotes
-        key = key.strip()
-        value = value.strip().strip("'")
-
-        # Store the result with the operator included
-        result[key] = (operator, value)
-
-    return result
-
-
 def to_string(data) -> str:
     if data is not None:
         if type(data) == DataFrame:
@@ -570,143 +583,58 @@ def to_string(data) -> str:
 if __name__ == '__main__':
 
     tools_list = ['restaurant_info', 'attraction_info', 'restaurant_distance', 'attraction_distance',
-                  'restaurant_search', 'attraction_search', 'notebook', 'planner', 'attraction_retrieval']
+                  'restaurant_search', 'attraction_search', 'notebook', 'planner', 'attraction_retrieval', 'finish']
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
     parser.add_argument("--model_name", type=str, default="glm-4-air")
     parser.add_argument("--output_dir", type=str, default="./logs")
     parser.add_argument("--dataset", type=str, default="fake")
-    parser.add_argument("--mode", type=str, default='reflection_zh')
+    parser.add_argument("--mode", type=str, default='our')
     args = parser.parse_args()
     print(args)
-    agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=15, react_llm_name=args.model_name,
-                       planner_llm_name=args.model_name, planner_mode=args.mode)
+
+    planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
+    solver_agent = Solver(mode=args.mode, tools=tools_list, max_steps=6, react_llm_name=args.model_name)
+    trimmer_agent = Trimmer(mode=args.mode, llm_name=args.model_name, solver_agent=solver_agent, max_step=3)
+
     start_time = time.time()
-
-    if args.mode == 'route_RAG_zh' or args.mode == 'route_bm25_RAG_zh':
-        evaluator = Evaluator(have_truth=True)
-        with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
-                  encoding='utf-8') as f:
-            all_data = json.load(f)
-        requires = all_data
-        print("The total number: " + str(len(requires)))
-
-        for index, item in tqdm(enumerate(requires)):
-            query = item["input"]
-            target_place = item["target_place"][0]
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
-                os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}'))
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')):
-                result = [{}]
-            else:
-                result = json.load(
-                    open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')))
-            try:
-                planner_results, scratchpad, action_log = agent.run(query=query, place=target_place, index=index)
-
-                if planner_results == 'Max Token Length Exceeded.':
-                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-                    result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
-                    action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
-                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-                else:
-                    result[-1][f'{args.model_name}_two-stage_query'] = query
-                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-                    result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-
-                # write to json file
-                with open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json'), 'w') as f:
-                    json.dump(result, f, indent=4, ensure_ascii=False)
-            except Exception as e:
-                print("Error in results")
-                print(e)
-                planner_results = "Error in results"
-                result[-1][f'{args.model_name}_two-stage_query'] = query
-                result[-1][f'{args.model_name}_two-stage_results_logs'] = None
-                result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-                result[-1][f'{args.model_name}_two-stage_action_logs'] = None
-            evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
-                                    query=query, truth=item["route"])
-
-        evaluator.print_real_result(args.mode)
-
-
-
-    elif args.dataset == 'real':
-        evaluator = Evaluator(have_truth=True)
-        with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
-                  encoding='utf-8') as f:
-            all_data = json.load(f)
-        requires = all_data
-        print("The total number: " + str(len(requires)))
-
-        for index, item in tqdm(enumerate(requires)):
-            query = item["ai_input"]
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
-                os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}'))
-            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')):
-                result = [{}]
-            else:
-                result = json.load(
-                    open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')))
-            try:
-                planner_results, scratchpad, action_log = agent.run(query=query, index=index)
-
-                if planner_results == 'Max Token Length Exceeded.':
-                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-                    result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
-                    action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
-                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-                else:
-                    result[-1][f'{args.model_name}_two-stage_query'] = query
-                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-                    result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-
-                # write to json file
-                with open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json'), 'w') as f:
-                    json.dump(result, f, indent=4, ensure_ascii=False)
-            except:
-                planner_results = "Error in results"
-                result[-1][f'{args.model_name}_two-stage_query'] = query
-                result[-1][f'{args.model_name}_two-stage_results_logs'] = None
-                result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-                result[-1][f'{args.model_name}_two-stage_action_logs'] = None
-            evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
-                                    query=query, truth=item["route"])
-
-        evaluator.print_real_result(args.mode)
-
-    else:
+    if True:
         evaluator = Evaluator()
-        print("The total number: 3")
         with open(f"data/base_request.json", 'r', encoding='utf-8') as f:
             all_data = json.load(f)
-
         step = 1
         for data in tqdm(all_data):
+            if step > 1:
+                break
             query = data["query"]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}')):
                 os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}'))
-
             result = [{}]
+            result[-1][f'{args.model_name}_query_{step}'] = query
+            plan_info = planner_agent.run(query)
+            print(plan_info)
+            match = re.search(r'(\{.*\})', plan_info, re.DOTALL)
+            tasks = []
+            solver_results = []
+            if match:
+                extracted_json = match.group(1)
+                json_data = json.loads(extracted_json)
+                plan_number = json_data["子任务数量"]
+                for i in range(plan_number):
+                    task = json_data[f"子任务 {i + 1}"]
+                    tasks.append(task)
+                    solver_result, scratchpad, action_log = solver_agent.run(query=task)
+                    solver_results.append(solver_result)
 
+                    result[-1][f'{args.model_name}_subtask_{i + 1}'] = query
+                    result[-1][f'{args.model_name}_results_logs_{i + 1}'] = scratchpad
+                    result[-1][f'{args.model_name}_results_{i + 1}'] = solver_result
+                    result[-1][f'{args.model_name}_action_logs_{i + 1}'] = action_log
 
-            planner_results, scratchpad, action_log = agent.run(query=query)
-
-
-            if planner_results == 'Max Token Length Exceeded.':
-                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-                result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
-                action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
-                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-            else:
-                result[-1][f'{args.model_name}_two-stage_query'] = query
-                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-                result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+            trimmer_result, trimmer_log = trimmer_agent.run(query=query, tasks=tasks, plans=solver_results)
+            result[-1][f'{args.model_name}_trimmer_logs_{step}'] = trimmer_log
+            result[-1][f'{args.model_name}_trimmer_results_{step}'] = trimmer_result
 
             # write to json file
             with open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{step}.json'), 'w', encoding='utf-8') as f:
@@ -714,7 +642,7 @@ if __name__ == '__main__':
 
             step += 1
 
-            evaluator.evaluate(agent_output=planner_results, externel_data=data)
+            evaluator.evaluate(agent_output=trimmer_result, externel_data=data)
 
         evaluator.print_result(args.mode)
     end_time = time.time()
