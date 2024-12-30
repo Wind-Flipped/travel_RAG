@@ -712,7 +712,7 @@ if __name__ == '__main__':
                 result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
 
             # write to json file
-            with open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{step}.json'), 'w') as f:
+            with open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{step}.json'), 'w', encoding='utf-8') as f:
                 json.dump(result, f, indent=4, ensure_ascii=False)
 
             step += 1
