@@ -627,7 +627,7 @@ if __name__ == '__main__':
                     solver_result, scratchpad, action_log = solver_agent.run(query=task)
                     solver_results.append(solver_result)
 
-                    result[-1][f'{args.model_name}_subtask_{i + 1}'] = query
+                    result[-1][f'{args.model_name}_subtask_{i + 1}'] = task
                     result[-1][f'{args.model_name}_results_logs_{i + 1}'] = scratchpad
                     result[-1][f'{args.model_name}_results_{i + 1}'] = solver_result
                     result[-1][f'{args.model_name}_action_logs_{i + 1}'] = action_log
