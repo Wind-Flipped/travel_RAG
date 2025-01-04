@@ -3,7 +3,7 @@ import re, string, os, sys
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 from typing import List, Dict, Any
 from pandas import DataFrame
-from our_prompt import planner_instruction, solver_instruction, trimmer_instruction
+from our_prompt import planner_instruction, solver_instruction, trimmer_instruction, evaluator_instruction
 import json
 from tqdm import tqdm
 import argparse
@@ -166,6 +166,92 @@ class Trimmer():
                 query=self.query,
                 task=self.task_str,
                 plan=self.plan_str)
+
+class Evaluator():
+    def __init__(self,
+                 mode: str = 'our',
+                 llm_name="deepseek-chat"):
+        self.mode = mode
+        self.llm_name = llm_name
+        if 'glm-4' in llm_name:
+            self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+        elif 'deepseek' in llm_name:
+            self.llm = LLMs(model_name=llm_name, api_key='sk-a0750ae6f78a4ddfb648d18e65b20ce0' ,rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+
+        if mode == 'our':
+            self.agent_prompt = evaluator_instruction
+
+        self.json_log = [{}]
+        self.thought = ''
+        self.action = ''
+        self.observation = ''
+
+    def run(self, query, thought, action, observation, reset=True):
+        if reset:
+            self.__reset_agent()
+        self.query = query
+        self.thought = thought
+        self.action = action
+        self.observation = observation
+        result = self.prompt_agent()
+        match = re.search(r'(\{.*\})', result, re.DOTALL)
+        try:
+            if match:
+                extracted_json = match.group(1)
+                data = json.loads(extracted_json)
+                analysis = data["分析"]
+                tag = data["评价"]
+                summary = data["总结"]
+                print(f"Analysis: {analysis}")
+                print(f"Tag: {tag}")
+                print(f"Summary: {summary}")
+                self.json_log[-1]['analysis'] = analysis
+                self.json_log[-1]['tag'] = tag
+                self.json_log[-1]['summary'] = summary
+                self.json_log.append({})
+            else:
+                summary = observation
+        except Exception as e:
+            summary = observation
+            print(e)
+            print("json evaluator is getting wrong")
+        return summary
+
+    def __reset_agent(self) -> None:
+        self.step_n = 1
+        self.query = ''
+        self.result = ''
+        self.thought = ''
+        self.action = ''
+        self.observation = ''
+        self.json_log = [{}]
+
+
+    def prompt_agent(self) -> str:
+        while True:
+            try:
+                # print(self._build_agent_prompt())
+                if 'glm-4' in self.llm_name or 'deepseek' in self.llm_name:
+                    request = format_step(self.llm(self._build_agent_prompt()))
+                else:
+                    # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
+                    request = " "
+                # print(request)
+                return request
+            except:
+                print("Error !")
+                return "Error !"
+
+    def _build_agent_prompt(self) -> str:
+        if self.mode == 'our':
+            return self.agent_prompt.format(
+                query=self.query,
+                thought=self.thought,
+                action=self.action,
+                observation=self.observation)
+
+    def get_logs(self):
+        return self.json_log
 
 class Solver:
     def __init__(self,

@@ -418,7 +418,7 @@ class Evaluator:
 
         return (extracted_price1 + extracted_price2) * people <= budget
 
-    def print_result(self, mode):
+    def print_result(self, mode, model_name='glm-4-air'):
         print(f"normal: {self.normal_num}")
         print(f"complete: {self.complete_num}")
         print(f"attraction: {self.attraction_num}")
@@ -437,9 +437,9 @@ class Evaluator:
                               "avg_distance": self.avg_distance / self.valid_distance if self.valid_distance > 0 else None,
                               "avg_score": self.avg_score / self.valid_score if self.valid_score > 0 else None})
         # save the results
-        if not os.path.exists(f'./testlogs/'):
-            os.makedirs(f'./testlogs/')
-        with open(os.path.join(f'./testlogs/{mode}_eval.json'), 'w') as f:
+        if not os.path.exists(f'./testlogs/{model_name}'):
+            os.makedirs(f'./testlogs/{model_name}')
+        with open(os.path.join(f'./testlogs/{model_name}/{mode}_eval.json'), 'w') as f:
             json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
 
 

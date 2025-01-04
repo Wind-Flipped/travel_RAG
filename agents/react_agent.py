@@ -25,6 +25,7 @@ from tools.notebook.apis import Notebook
 from tools.planner.apis import Planner
 from evaluate import Evaluator
 import time
+from our_prompt import evaluator_instruction
 
 # OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 
@@ -37,6 +38,91 @@ actionMapping = {'RestaurantInfo':'restaurant_info', 'AttractionInfo':'attractio
                  'RestaurantDistance':'restaurant_distance', 'AttractionDistance':'attraction_distance',
                  'RestaurantSearch': 'restaurant_search', 'AttractionSearch':'attraction_search',
                  'Notebook':'notebook','Planner':'planner', 'AttractionRetrieval': 'attraction_retrieval'}
+
+
+class EvaluatorLLM():
+    def __init__(self,
+                 mode: str = 'our',
+                 llm_name="deepseek-chat"):
+        self.mode = mode
+        self.llm_name = llm_name
+        if 'glm-4' in llm_name:
+            self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+        elif 'deepseek' in llm_name:
+            self.llm = LLMs(model_name=llm_name, api_key='sk-a0750ae6f78a4ddfb648d18e65b20ce0', rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+
+        if mode == 'our':
+            self.agent_prompt = evaluator_instruction
+
+        self.json_log = [{}]
+        self.thought = ''
+        self.action = ''
+        self.observation = ''
+
+    def run(self, query, thought, action, observation, reset=True):
+        if reset:
+            self.__reset_agent()
+        self.query = query
+        self.thought = thought
+        self.action = action
+        self.observation = observation
+        result = self.prompt_agent()
+        match = re.search(r'(\{.*\})', result, re.DOTALL)
+        try:
+            if match:
+                extracted_json = match.group(1)
+                data = json.loads(extracted_json)
+                analysis = data["分析"]
+                tag = data["评价"]
+                summary = data["总结"]
+                print(f"Analysis: {analysis}")
+                print(f"Tag: {tag}")
+                print(f"Summary: {summary}")
+                self.json_log[-1]['analysis'] = analysis
+                self.json_log[-1]['tag'] = tag
+                self.json_log[-1]['summary'] = summary
+                self.json_log.append({})
+            else:
+                summary = observation
+        except Exception as e:
+            summary = observation
+            print(e)
+            print("json evaluator is getting wrong")
+        return summary
+
+    def __reset_agent(self) -> None:
+        self.query = ''
+        self.result = ''
+        self.thought = ''
+        self.action = ''
+        self.observation = ''
+        self.json_log = [{}]
+
+    def prompt_agent(self) -> str:
+        while True:
+            try:
+                # print(self._build_agent_prompt())
+                if 'glm-4' in self.llm_name or 'deepseek' in self.llm_name:
+                    request = format_step(self.llm(self._build_agent_prompt()))
+                else:
+                    # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
+                    request = " "
+                # print(request)
+                return request
+            except:
+                print("Error !")
+                return "Error !"
+
+    def _build_agent_prompt(self) -> str:
+        if self.mode == 'our':
+            return self.agent_prompt.format(
+                query=self.query,
+                thought=self.thought,
+                action=self.action,
+                observation=self.observation)
+
+    def get_logs(self):
+        return self.json_log
 
 class ReactAgent:
     def __init__(self,
@@ -54,8 +140,15 @@ class ReactAgent:
 
         self.answer = ''
         self.max_steps = max_steps
+        if mode == 'test1':
+            print("Test1 mode is activated.")
+            mode = 'zero_shot_zh'
+            planner_mode = mode
+            self.mode = mode
         self.mode = mode
         self.planner_mode = planner_mode
+
+        self.evaluate_llm = EvaluatorLLM()
 
         if 'glm-4' in react_llm_name or "deepseek-chat" in react_llm_name:
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
@@ -226,7 +319,7 @@ class ReactAgent:
                         self.action_info = f"餐厅{action_arg}的信息"
                         self.current_data = self.tools[pending_action].run(action_arg)
                         self.current_observation = f"餐厅{action_arg}的信息为{self.current_data}"
-                        self.scratchpad += self.current_observation
+                        self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
@@ -243,7 +336,7 @@ class ReactAgent:
                         self.current_data = self.tools[pending_action].run_for_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
                         self.current_data = f"餐厅{action_arg.split(', ')[0]}到餐厅{action_arg.split(', ')[1]}的距离为{self.current_data}千米"
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
-                        self.scratchpad += self.current_observation
+                        self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
@@ -260,7 +353,7 @@ class ReactAgent:
                         self.current_data = self.tools[pending_action].get_nearest_restaurants(
                             float(action_arg.split(', ')[0]), float(action_arg.split(', ')[1]), int(action_arg.split(', ')[2]))
                         self.current_observation =f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家餐厅的信息为：{self.current_data}"
-                        self.scratchpad += self.current_observation
+                        self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
@@ -277,7 +370,7 @@ class ReactAgent:
                         self.current_data = self.tools[pending_action].get_nearest_restaurants(
                             float(action_arg.split(', ')[0]), float(action_arg.split(', ')[1]), int(action_arg.split(', ')[2]))
                         self.current_observation = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家景点的信息为{self.current_data}"
-                        self.scratchpad += self.current_observation
+                        self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
@@ -294,7 +387,7 @@ class ReactAgent:
                         self.action_info = f"景点{action_arg}的信息"
                         self.current_data = self.tools[pending_action].run(action_arg)
                         self.current_observation = f"景点{action_arg}的信息为{self.current_data}"
-                        self.scratchpad += self.current_observation
+                        self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
@@ -311,7 +404,7 @@ class ReactAgent:
                         self.current_data = self.tools[pending_action].run_for_distance(action_arg.split(', ')[0], action_arg.split(', ')[1])
                         self.current_data = f"景点{action_arg.split(', ')[0]}到景点{action_arg.split(', ')[1]}的距离为{self.current_data}千米"
                         self.current_observation = to_string(self.current_data).strip()
-                        self.scratchpad += self.current_observation
+                        self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
@@ -328,7 +421,7 @@ class ReactAgent:
                         self.current_data = self.tools[pending_action].run(action_arg.split(', ')[0], int(action_arg.split(', ')[1]))
                         self.current_data = f"查找到与{action_arg.split(', ')[0]}类型相似的景点信息为{self.current_data}"
                         self.current_observation = to_string(self.current_data).strip()
-                        self.scratchpad += self.current_observation
+                        self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
                         self.json_log[-1]['state'] = f'Successful'
 
@@ -481,8 +574,13 @@ class ReactAgent:
         return self.llm.get_tokens()
 
 
-### String Stuff ###
-# gpt2_enc = tiktoken.encoding_for_model("text-davinci-003")
+    def evaluate_observation(self, query, thought, action, observation):
+        evaluate = self.evaluate_llm.run(query, thought, action, observation)
+        self.scratchpad += evaluate
+        self.current_observation = evaluate
+        print(evaluate)
+    def get_evaluator_log(self):
+        return self.evaluate_llm.get_logs()
 
 
 def parse_action(string):
@@ -579,11 +677,15 @@ if __name__ == '__main__':
     parser.add_argument("--set_type", type=str, default="test")
     parser.add_argument("--model_name", type=str, default='deepseek-chat')
     parser.add_argument("--output_dir", type=str, default="./logs_deepseek")
-    parser.add_argument("--dataset", type=str, default="real")
-    parser.add_argument("--mode", type=str, default='route_bm25_RAG_zh')
+    parser.add_argument("--dataset", type=str, default="simulated")
+    parser.add_argument("--mode", type=str, default='test1')
     args = parser.parse_args()
     print(args)
-    agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
+    if args.mode == 'reflection_zh':
+        max_steps = 15
+    else:
+        max_steps = 10
+    agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=max_steps, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name, planner_mode=args.mode)
     start_time = time.time()
 
@@ -688,12 +790,13 @@ if __name__ == '__main__':
 
     else:
         evaluator = Evaluator()
-        print("The total number: 3")
         with open(f"data/base_request.json", 'r', encoding='utf-8') as f:
             all_data = json.load(f)
 
         step = 1
         for data in tqdm(all_data):
+            if step > 2:
+                break
             query = data["query"]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}')):
                 os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}'))
@@ -723,7 +826,7 @@ if __name__ == '__main__':
 
             evaluator.evaluate(agent_output=planner_results, externel_data=data)
 
-        evaluator.print_result(args.mode)
+        evaluator.print_result(args.mode, args.model_name)
         prompt_tokens, completion_tokens = agent.get_tokens()
         print("prompt_tokens: ", prompt_tokens)
         print("completion_tokens: ", completion_tokens)
