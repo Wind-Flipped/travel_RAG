@@ -57,7 +57,7 @@ class Planner:
                  mode = 'zero_shot_reformat_zh',
                  ) -> None:
         self.mode = mode
-        if mode == 'zero_shot_reformat_zh' or mode == 'route_RAG_zh':
+        if mode == 'zero_shot_reformat_zh' or mode == 'route_RAG_zh' or mode == 'route_bm25_RAG_zh':
             self.agent_prompt = planner_agent_prompt_zh
         elif mode == "zero_shot_zh":
             self.agent_prompt = planner_zero_shot_zh
@@ -68,7 +68,7 @@ class Planner:
         self.model_name = model_name
 
 
-        if 'glm-4' in model_name:
+        if 'glm-4' in model_name or "deepseek-chat" in model_name:
             self.llm = LLMs(model_name=self.model_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
             print("LLM's name is getting wrong")
@@ -78,13 +78,13 @@ class Planner:
 
     def run(self, text, query, route=None) -> str:
         # print(self._build_agent_prompt(text, query))
-        if self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
+        if self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
             return str(self.llm(self._build_agent_prompt(text, query, route)))
         elif self.mode == "zero_shot_zh" or self.mode == "reflection_zh":
             return str(self.llm(self._build_agent_prompt(text, query, route)))
 
     def _build_agent_prompt(self, text, query, route) -> str:
-        if self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh':
+        if self.mode == 'zero_shot_reformat_zh' or self.mode == 'route_RAG_zh' or self.mode == 'route_bm25_RAG_zh':
             return self.agent_prompt.format(
                 text=text,
                 query=query,

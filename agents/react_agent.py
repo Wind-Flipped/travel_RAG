@@ -57,7 +57,7 @@ class ReactAgent:
         self.mode = mode
         self.planner_mode = planner_mode
 
-        if 'glm-4' in react_llm_name:
+        if 'glm-4' in react_llm_name or "deepseek-chat" in react_llm_name:
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
             print("LLM's name is getting wrong")
@@ -405,16 +405,16 @@ class ReactAgent:
         while True:
             try:
                 # print(self._build_agent_prompt())
-                if 'glm-4' in self.react_name:
+                if 'glm-4' in self.react_name or 'deepseek-chat' in self.react_name:
                     request = format_step(self.llm(self._build_agent_prompt()))
                 else:
-                    # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
-                    request = " "
+                    request = format_step(self.llm(self._build_agent_prompt()))
                 # print(request)
                 return request
-            except:
+            except Exception as e:
 
-                print("Error !")
+                print("prompt_agent Error !")
+                print(e)
                 return "Error !"
 
     def _build_agent_prompt(self) -> str:
@@ -476,6 +476,9 @@ class ReactAgent:
         for unit in lines:
             city_set.append(unit)
         return city_set
+
+    def get_tokens(self):
+        return self.llm.get_tokens()
 
 
 ### String Stuff ###
@@ -574,13 +577,13 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default="glm-4-air")
-    parser.add_argument("--output_dir", type=str, default="./logs")
-    parser.add_argument("--dataset", type=str, default="fake")
-    parser.add_argument("--mode", type=str, default='reflection_zh')
+    parser.add_argument("--model_name", type=str, default='deepseek-chat')
+    parser.add_argument("--output_dir", type=str, default="./logs_deepseek")
+    parser.add_argument("--dataset", type=str, default="real")
+    parser.add_argument("--mode", type=str, default='route_bm25_RAG_zh')
     args = parser.parse_args()
     print(args)
-    agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=15, react_llm_name=args.model_name,
+    agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name, planner_mode=args.mode)
     start_time = time.time()
 
@@ -630,13 +633,14 @@ if __name__ == '__main__':
             evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
                                     query=query, truth=item["route"])
 
-        evaluator.print_real_result(args.mode)
-
-
+        evaluator.print_real_result(args.mode, args.model_name)
+        prompt_tokens, completion_tokens = agent.get_tokens()
+        print("prompt_tokens: ", prompt_tokens)
+        print("completion_tokens: ", completion_tokens)
 
     elif args.dataset == 'real':
         evaluator = Evaluator(have_truth=True)
-        with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
+        with open(f"rag/databases/hangzhou/key_place2_requests.json", 'r',
                   encoding='utf-8') as f:
             all_data = json.load(f)
         requires = all_data
@@ -677,7 +681,10 @@ if __name__ == '__main__':
             evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
                                     query=query, truth=item["route"])
 
-        evaluator.print_real_result(args.mode)
+        evaluator.print_real_result(args.mode, args.model_name)
+        prompt_tokens, completion_tokens = agent.get_tokens()
+        print("prompt_tokens: ", prompt_tokens)
+        print("completion_tokens: ", completion_tokens)
 
     else:
         evaluator = Evaluator()
@@ -717,6 +724,9 @@ if __name__ == '__main__':
             evaluator.evaluate(agent_output=planner_results, externel_data=data)
 
         evaluator.print_result(args.mode)
+        prompt_tokens, completion_tokens = agent.get_tokens()
+        print("prompt_tokens: ", prompt_tokens)
+        print("completion_tokens: ", completion_tokens)
     end_time = time.time()
 
     print(f"Time taken: {end_time - start_time} seconds")

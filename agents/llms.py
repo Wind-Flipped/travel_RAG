@@ -1,8 +1,8 @@
 from zhipuai import ZhipuAI
 import sys, os
 # sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./agents")))
-from prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
-
+from agents.prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
+from openai import OpenAI
 
 
 from agents.rag.component.embedding import Zhipuembedding
@@ -17,12 +17,15 @@ class LLMs:
         # 初始化大模型
         self.model_name = model_name
         self.temperature = temperature
-        self.model = ZhipuAI(api_key=api_key)
+        if model_name == 'glm-4-air':
+            self.model = ZhipuAI(api_key=api_key)
+        elif model_name == 'deepseek-chat':
+            print("Using deepseek-chat")
+            self.model = OpenAI(api_key="sk-a416cf4db0f246ae9fd6f9c620e11d9f", base_url="https://api.deepseek.com")
 
-        # 加载向量数据库，embedding模型
-        # self.db = Vectordatabase(api_key=api_key)
-        # self.db.load_vector(rag_database)
-        # self.embedding_model = Zhipuembedding()
+
+        self.prompt_token = 0
+        self.completion_token = 0
 
     # 定义chat方法
     def __call__(self, prompt: str, stop: list = None):
@@ -33,6 +36,8 @@ class LLMs:
                 {"role": "user", "content": prompt},
             ]
         )
+        self.prompt_token += response.usage.prompt_tokens
+        self.completion_token += response.usage.completion_tokens
 
         return response.choices[0].message.content
 
@@ -40,6 +45,8 @@ class LLMs:
     def get_model(self):
         return self.model
 
+    def get_tokens(self):
+        return self.prompt_token, self.completion_token
 
 class VectorDatabase:
     def __init__(self, model = ZhipuAI(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE"),

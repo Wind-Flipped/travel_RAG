@@ -44,11 +44,11 @@ class Evaluator:
         if have_truth:
             self.embedding_model = Zhipuembedding(api_key=api_key)
 
-            with open("/home/wangb/cyo/graduation/rag/databases/popularity.json", 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            self.popularity = {eval(key): value for key, value in data.items()}
+            # with open("/home/wangb/cyo/graduation/rag/databases/popularity.json", 'r', encoding='utf-8') as f:
+            #     data = json.load(f)
+            # self.popularity = {eval(key): value for key, value in data.items()}
 
-            with open('/home/wangb/cyo/graduation/rag/databases/hangzhou_poi_coo2.json', 'r', encoding='utf-8') as file:
+            with open('rag/databases/hangzhou_poi_coo2.json', 'r', encoding='utf-8') as file:
                 poi_file = json.load(file)
             self.poi_dict = {poi['name']: poi for poi in poi_file}
 
@@ -142,9 +142,9 @@ class Evaluator:
                 self.distance_similarity += score
                 self.eval_log[-1]["distance_similarity"] = score
 
-                score = self.calculate_popularity_similarity(attraction_list, truth)
-                self.popularity_similarity += score
-                self.eval_log[-1]["popularity_similarity"] = score
+                # score = self.calculate_popularity_similarity(attraction_list, truth)
+                # self.popularity_similarity += score
+                # self.eval_log[-1]["popularity_similarity"] = score
 
                 score = self.calculate_request2route(attraction_list, truth)
                 self.request2route += score
@@ -237,9 +237,9 @@ class Evaluator:
                 self.distance_similarity += score
                 self.eval_log[-1]["distance_similarity"] = score
 
-                score = self.calculate_popularity_similarity(attraction_list, truth)
-                self.popularity_similarity += score
-                self.eval_log[-1]["popularity_similarity"] = score
+                # score = self.calculate_popularity_similarity(attraction_list, truth)
+                # self.popularity_similarity += score
+                # self.eval_log[-1]["popularity_similarity"] = score
 
                 score = self.calculate_request2route(attraction_list, truth)
                 self.request2route += score
@@ -255,7 +255,7 @@ class Evaluator:
             print(e)
             print(f'Step {self.step} result not completed')
 
-    def print_real_result(self, mode):
+    def print_real_result(self, mode, model_name='glm-4-air'):
         print(f"normal: {self.normal_num}")
         print(f"complete: {self.complete_num}")
         print(f"attraction: {self.attraction_num}")
@@ -282,9 +282,9 @@ class Evaluator:
              "distance_similarity": self.distance_similarity / self.normal_num, "request2route": self.request2route / self.normal_num,
              "popularity_similarity": self.popularity_similarity / self.normal_num, "center_distance": self.center_distance / self.normal_num})
         # save the results
-        if not os.path.exists(f'./logs/{mode}'):
-            os.makedirs(f'./logs/{mode}')
-        with open(os.path.join(f'./logs/{mode}/real_eval.json'), 'w') as f:
+        if not os.path.exists(f'./logs/{model_name}/{mode}'):
+            os.makedirs(f'./logs/{model_name}/{mode}')
+        with open(os.path.join(f'./logs/{model_name}/{mode}/real_eval.json'), 'w') as f:
             json.dump(self.eval_log, f, indent=4, ensure_ascii=False)
 
 
@@ -568,16 +568,16 @@ class Evaluator:
         return dots / valid_pois
 
 
-    def calculate_popularity_similarity(self, route, truth):
-        popularity1 = self.aggregate_poi_popularity(route)
-        popularity2 = self.aggregate_poi_popularity(truth)
-        popularity_diff = abs(popularity1 - popularity2)
-        if popularity2 != 0:
-            popularity_similarity = popularity_diff / popularity2
-            return popularity_similarity
-        else:
-            print(f'truth {truth} has no popularity')
-            return 0
+    # def calculate_popularity_similarity(self, route, truth):
+    #     popularity1 = self.aggregate_poi_popularity(route)
+    #     popularity2 = self.aggregate_poi_popularity(truth)
+    #     popularity_diff = abs(popularity1 - popularity2)
+    #     if popularity2 != 0:
+    #         popularity_similarity = popularity_diff / popularity2
+    #         return popularity_similarity
+    #     else:
+    #         print(f'truth {truth} has no popularity')
+    #         return 0
 
 
     def calculate_ai_similarity(self, route, request):
