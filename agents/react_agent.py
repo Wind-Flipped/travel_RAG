@@ -124,6 +124,9 @@ class EvaluatorLLM():
     def get_logs(self):
         return self.json_log
 
+    def get_tokens(self):
+        return self.llm.get_tokens()
+
 class ReactAgent:
     def __init__(self,
                  mode: str = 'zero_shot_reformat_zh',
@@ -140,8 +143,8 @@ class ReactAgent:
 
         self.answer = ''
         self.max_steps = max_steps
-        if mode == 'test1':
-            print("Test1 mode is activated.")
+        if mode == 'test1' or mode == 'test2':
+            print(f"{mode} mode is activated.")
             mode = 'zero_shot_zh'
             planner_mode = mode
             self.mode = mode
@@ -269,10 +272,12 @@ class ReactAgent:
         self.json_log[-1]['action'] = action
         # examine if the same action has been repeated 3 times consecutively
         if len(self.last_actions) == 3:
-            print("The same action has been repeated 3 times consecutively. So we stop here.")
+            print("The same action has been repeated 3 times consecutively.")
             # self.log_file.write("The same action has been repeated 3 times consecutively. So we stop here.")
             self.json_log[-1]['state'] = 'same action 3 times repeated'
-            self.finished = True
+            self.current_observation = '你已经连续重复了这个相同的行动3次，工具不能再给你返回结果，请不要再次重复这个行动了，从其他的角度思考并行动。'
+            self.evaluate_observation(self.query, thought, action, self.current_observation)
+            # self.finished = True
             return
 
         # action_type, action_arg = parse_action(action)
@@ -576,11 +581,14 @@ class ReactAgent:
 
     def evaluate_observation(self, query, thought, action, observation):
         evaluate = self.evaluate_llm.run(query, thought, action, observation)
-        self.scratchpad += evaluate
+        self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
         self.current_observation = evaluate
         print(evaluate)
     def get_evaluator_log(self):
         return self.evaluate_llm.get_logs()
+
+    def get_evaluator_tokens(self):
+        return self.evaluate_llm.get_tokens()
 
 
 def parse_action(string):
@@ -678,7 +686,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default='deepseek-chat')
     parser.add_argument("--output_dir", type=str, default="./logs_deepseek")
     parser.add_argument("--dataset", type=str, default="simulated")
-    parser.add_argument("--mode", type=str, default='test1')
+    parser.add_argument("--mode", type=str, default='test2')
     args = parser.parse_args()
     print(args)
     if args.mode == 'reflection_zh':
@@ -795,8 +803,6 @@ if __name__ == '__main__':
 
         step = 1
         for data in tqdm(all_data):
-            if step > 2:
-                break
             query = data["query"]
             if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}')):
                 os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}'))
@@ -830,6 +836,10 @@ if __name__ == '__main__':
         prompt_tokens, completion_tokens = agent.get_tokens()
         print("prompt_tokens: ", prompt_tokens)
         print("completion_tokens: ", completion_tokens)
+
+        eval_prompt_tokens, eval_completion_tokens = agent.get_evaluator_tokens()
+        print("eval_prompt_tokens: ", eval_prompt_tokens)
+        print("eval_completion_tokens: ", eval_completion_tokens)
     end_time = time.time()
 
     print(f"Time taken: {end_time - start_time} seconds")
