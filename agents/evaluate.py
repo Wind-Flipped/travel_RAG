@@ -607,19 +607,4 @@ class Evaluator:
 if __name__ == '__main__':
     restaurant = Restaurants()
     attraction = Attractions()
-    data = ""
-    # attraction1 = data['上午景点']
-    # lunch = data['午餐']
-    # attraction2 = data['下午景点']
-    # dinner = data['晚餐']
-    # price1 = restaurant.run(lunch)["price"]
-    # match = re.search(r'(\d+)', price1)
-    # if match:
-    #     extracted_price1 = int(match.group(1))
-    # price2 = restaurant.run(dinner)["price"]
-    # match = re.search(r'(\d+)', price2)
-    # if match:
-    #     extracted_price2 = int(match.group(1))
-    # people = 6
-    # budget = 1716
-    # print((extracted_price1 + extracted_price2) * people <= budget)
+

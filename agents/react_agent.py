@@ -277,6 +277,7 @@ class ReactAgent:
             self.json_log[-1]['state'] = 'same action 3 times repeated'
             self.current_observation = '你已经连续重复了这个相同的行动3次，工具不能再给你返回结果，请不要再次重复这个行动了，从其他的角度思考并行动。'
             self.evaluate_observation(self.query, thought, action, self.current_observation)
+            self.json_log[-1]['observation'] = self.current_observation
             # self.finished = True
             return
 

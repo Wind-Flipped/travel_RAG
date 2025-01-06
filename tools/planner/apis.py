@@ -57,6 +57,9 @@ class Planner:
                  mode = 'zero_shot_reformat_zh',
                  ) -> None:
         self.mode = mode
+        if mode == 'our':
+            mode = "zero_shot_zh"
+            self.mode = mode
         if mode == 'zero_shot_reformat_zh' or mode == 'route_RAG_zh' or mode == 'route_bm25_RAG_zh':
             self.agent_prompt = planner_agent_prompt_zh
         elif mode == "zero_shot_zh":
