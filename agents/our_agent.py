@@ -163,12 +163,14 @@ class EvaluatorLLM:
                 self.json_log[-1]['summary'] = summary
                 self.json_log.append({})
             else:
+                tag = 'Success'
                 summary = observation
         except Exception as e:
+            tag = 'Success'
             summary = observation
             print(e)
             print("json evaluator is getting wrong")
-        return summary
+        return tag, summary
 
     def __reset_agent(self) -> None:
         self.step_n = 1
@@ -385,7 +387,6 @@ class Solver:
                         self.current_observation = f"餐厅{action_arg}的信息为{self.current_data}"
                         self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
-                        self.json_log[-1]['state'] = f'Successful'
 
                     except Exception as e:
                         print(e)
@@ -402,7 +403,6 @@ class Solver:
                         self.current_observation = to_string(self.current_data).strip('\n').strip()
                         self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
-                        self.json_log[-1]['state'] = f'Successful'
 
                     except Exception as e:
                         print(e)
@@ -419,7 +419,7 @@ class Solver:
                         self.current_observation =f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家餐厅的信息为：{self.current_data}"
                         self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
-                        self.json_log[-1]['state'] = f'Successful'
+
 
                     except Exception as e:
                         print(e)
@@ -436,7 +436,7 @@ class Solver:
                         self.current_observation = f"在经纬度（{action_arg.split(', ')[0]}, {action_arg.split(', ')[1]}）附近的{action_arg.split(', ')[2]}家景点的信息为{self.current_data}"
                         self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
-                        self.json_log[-1]['state'] = f'Successful'
+
 
                     except Exception as e:
                         print(e)
@@ -445,7 +445,6 @@ class Solver:
                         self.scratchpad += f'Illegal Attraction Search. Please try again.'
                         self.json_log[-1]['state'] = f'Illegal args. Other Error'
 
-
                 elif action_type == 'AttractionInfo':
                     try:
                         self.action_info = f"景点{action_arg}的信息"
@@ -453,7 +452,6 @@ class Solver:
                         self.current_observation = f"景点{action_arg}的信息为{self.current_data}"
                         self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
-                        self.json_log[-1]['state'] = f'Successful'
 
                     except Exception as e:
                         print(e)
@@ -470,7 +468,6 @@ class Solver:
                         self.current_observation = to_string(self.current_data).strip()
                         self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
-                        self.json_log[-1]['state'] = f'Successful'
 
                     except Exception as e:
                         print(e)
@@ -487,7 +484,6 @@ class Solver:
                         self.current_observation = to_string(self.current_data).strip()
                         self.evaluate_observation(self.query, thought, action, self.current_observation)
                         self.__reset_record()
-                        self.json_log[-1]['state'] = f'Successful'
 
                     except Exception as e:
                         print(e)
@@ -606,16 +602,29 @@ class Solver:
 
 
     def evaluate_observation(self, query, thought, action, observation):
-        reflection, summary = self.reflect_llm.run(query, self.scratchpad)
-        if reflection == 'Success':
-            evaluate = self.evaluate_llm.run(query, thought, action, observation)
+        # Do not use self-reflection in the first step
+        if self.step_n == 1:
+            tag, evaluate = self.evaluate_llm.run(query, thought, action, observation)
             self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
             self.current_observation = evaluate
-            print(evaluate)
+            if tag == 'Success':
+                self.json_log[-1]['state'] = f'Successful Evaluation'
+            else:
+                self.json_log[-1]['state'] = f'Unsuccessful Evaluation'
         else:
-            self.scratchpad += f'Observation {self.step_n}: {summary}\n'
-            self.current_observation = summary
-            print(summary)
+            reflection, summary = self.reflect_llm.run(query, self.scratchpad)
+            if reflection == 'Success':
+                tag, evaluate = self.evaluate_llm.run(query, thought, action, observation)
+                self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
+                self.current_observation = evaluate
+                if tag == 'Success':
+                    self.json_log[-1]['state'] = f'Successful Evaluation'
+                else:
+                    self.json_log[-1]['state'] = f'Unsuccessful Evaluation'
+            else:
+                self.scratchpad += f'Observation {self.step_n}: {summary}\n'
+                self.current_observation = summary
+                self.json_log[-1]['state'] = f'Unsuccessful Reflection'
 
     def get_evaluator_log(self):
         return self.evaluate_llm.get_logs()
@@ -677,7 +686,7 @@ if __name__ == '__main__':
 
     # planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
     agent = Solver(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name)
-
+    args.mode = 'our2'
     start_time = time.time()
     evaluator = Evaluator()
     with open(f"data/base_request.json", 'r', encoding='utf-8') as f:

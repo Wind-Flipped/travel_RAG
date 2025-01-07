@@ -19,7 +19,7 @@ class Tools:
             name: str,
             ) -> DataFrame:
         """Search for attraction ."""
-        results = self.data[self.data['shopname'] == name]
+        results = self.data[self.data['shopname'].str.replace('餐厅', '') == name.replace('餐厅', '')]
         if len(results) == 0:
             return f"There is no {name} in this city."
         return results.iloc[0].dropna().to_dict()
@@ -38,7 +38,7 @@ class Tools:
         :param name:
         :return: (latitude, longitude)
         '''
-        result = self.data[self.data['shopname'] == name]
+        result = self.data[self.data['shopname'].str.replace('餐厅', '') == name.replace('餐厅', '')]
         if len(result) == 0:
             return None
         return (result.iloc[0].to_dict()['latitude'], result.iloc[0].to_dict()['longitude'])
@@ -118,11 +118,13 @@ class Restaurants(Tools):
 
 
 
-
 if __name__ == '__main__':
     attractions = Attractions()
+    restaurant = Restaurants()
+    # print(attractions.run("西湖"))
+    # print(attractions.run_for_distance("西湖", "风景区"))
+    # print(attractions.get_nearest_restaurants(30.26090127, 120.1470172, 10))
+    # print(attractions.get_one_shopname())
 
-    print(attractions.run("西湖"))
-    print(attractions.run_for_distance("西湖", "风景区"))
-    print(attractions.get_nearest_restaurants(30.26090127, 120.1470172, 10))
-    print(attractions.get_one_shopname())
+    print(restaurant.run("TateIsland泰特岛"))
+
