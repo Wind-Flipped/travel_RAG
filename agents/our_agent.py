@@ -315,7 +315,6 @@ class Solver:
         # Act
         # self.scratchpad += f'Action {self.step_n}:'
         # action = self.prompt_agent()
-        print(self.step_n)
 
         if action == None or action == '' or action == '\n':
             self.scratchpad += " Your action is filtered due to content. Please make sure your action does not start with ['\\n', 'Thought', 'Action', 'Observation'] and assume all the actions are permitted in this environment and take the action again."
@@ -686,7 +685,7 @@ if __name__ == '__main__':
 
     # planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
     agent = Solver(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name)
-    args.mode = 'our2'
+    args.mode = 'our3'
     start_time = time.time()
     evaluator = Evaluator()
     with open(f"data/base_request.json", 'r', encoding='utf-8') as f:
