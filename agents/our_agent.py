@@ -3,7 +3,7 @@ import re, string, os, sys
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 from typing import List, Dict, Any
 from pandas import DataFrame
-from our_prompt import planner_instruction, solver_instruction, trimmer_instruction, evaluator_instruction, reflection_instruction
+from our_prompt import planner_instruction, solver_instruction, trimmer_instruction, evaluator_instruction, reflection_instruction, solver_routes_instruction
 import json
 from tqdm import tqdm
 import argparse
@@ -241,6 +241,8 @@ class Solver:
 
         if self.mode == 'our':
             self.agent_prompt = solver_instruction
+        elif self.mode == 'route_bm25_RAG_zh':
+            self.agent_prompt = solver_routes_instruction
 
 
         self.vector_database = VectorDatabase(model=self.llm.get_model(), model_name=react_llm_name)
@@ -271,12 +273,19 @@ class Solver:
 
         self.__reset_agent()
 
-    def run(self, query, reset=True) -> None:
+    def run(self, query, place=None, index=-1, reset=True) -> None:
 
         self.query = query
 
         if reset:
             self.__reset_agent()
+
+        if self.mode == 'route_bm25_RAG_zh':
+            match = re.search(r"要求是：(.*?)。", query)
+            if match:
+                query = match.group(1)
+            self.route_info, self.poi_info = self.vector_database.get_route_info_with_bm25(query=query, place=place, index=index)
+
 
         while not self.is_halted() and not self.is_finished():
             self.step()
@@ -500,8 +509,12 @@ class Solver:
                     print(e)
 
             elif action_type == "Planner":
-                self.current_observation = str(
-                    self.tools["planner"].run(self.scratchpad, query=action_arg, route=None))
+                if self.mode == 'our':
+                    self.current_observation = str(
+                        self.tools["planner"].run(self.scratchpad, query=action_arg, route=None))
+                elif self.mode == 'route_bm25_RAG_zh':
+                    self.current_observation = str(
+                        self.tools["planner"].run(self.scratchpad, query=action_arg, route=self.route_info))
                 self.scratchpad += self.current_observation
                 self.answer = self.current_observation
                 self.__reset_record()
@@ -552,8 +565,14 @@ class Solver:
         if self.mode == 'our':
             return self.agent_prompt.format(
                 query=self.query,
-                scratchpad=self.scratchpad)
-
+                scratchpad=self.scratchpad
+            )
+        elif self.mode == 'route_bm25_RAG_zh':
+            return self.agent_prompt.format(
+                query=self.query,
+                scratchpad=self.scratchpad,
+                route_info=self.route_info
+            )
     def is_finished(self) -> bool:
         return self.finished
 
@@ -678,61 +697,125 @@ if __name__ == '__main__':
     parser.add_argument("--set_type", type=str, default="test")
     parser.add_argument("--model_name", type=str, default="deepseek-chat")
     parser.add_argument("--output_dir", type=str, default="./logs")
-    parser.add_argument("--dataset", type=str, default="fake")
-    parser.add_argument("--mode", type=str, default='our')
+    parser.add_argument("--dataset", type=str, default="real")
+    parser.add_argument("--mode", type=str, default='route_bm25_RAG_zh')
     args = parser.parse_args()
     print(args)
 
     # planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
     agent = Solver(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name)
-    args.mode = 'our3'
+    args.mode = 'all_real_deepseek'
     start_time = time.time()
     evaluator = Evaluator()
-    with open(f"data/base_request.json", 'r', encoding='utf-8') as f:
-        all_data = json.load(f)
+    if args.dataset == "fake":
+        with open(f"data/base_request.json", 'r', encoding='utf-8') as f:
+            all_data = json.load(f)
 
-    step = 1
-    for data in tqdm(all_data):
-        query = data["query"]
-        if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}')):
-            os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}'))
+        step = 1
+        for data in tqdm(all_data):
+            query = data["query"]
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}')):
+                os.makedirs(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}'))
 
-        result = [{}]
+            result = [{}]
 
-        planner_results, scratchpad, action_log = agent.run(query=query)
+            planner_results, scratchpad, action_log = agent.run(query=query)
 
-        if planner_results == 'Max Token Length Exceeded.':
-            result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-            result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
-            action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
-            result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
-        else:
-            result[-1][f'{args.model_name}_two-stage_query'] = query
-            result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
-            result[-1][f'{args.model_name}_two-stage_results'] = planner_results
-            result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+            if planner_results == 'Max Token Length Exceeded.':
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
+                action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+            else:
+                result[-1][f'{args.model_name}_two-stage_query'] = query
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
 
-        # write to json file
-        with open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{step}.json'), 'w',
+            # write to json file
+            with open(os.path.join(f'{args.output_dir}/{args.set_type}/{args.mode}/generated_plan_{step}.json'), 'w',
+                      encoding='utf-8') as f:
+                json.dump(result, f, indent=4, ensure_ascii=False)
+
+            step += 1
+
+            evaluator.evaluate(agent_output=planner_results, externel_data=data)
+
+        evaluator.print_result(args.mode, args.model_name)
+        prompt_tokens, completion_tokens = agent.get_tokens()
+        print("prompt_tokens: ", prompt_tokens)
+        print("completion_tokens: ", completion_tokens)
+
+        eval_prompt_tokens, eval_completion_tokens = agent.get_evaluator_tokens()
+        print("eval_prompt_tokens: ", eval_prompt_tokens)
+        print("eval_completion_tokens: ", eval_completion_tokens)
+
+        reflection_prompt_tokens, reflection_completion_tokens = agent.get_reflection_tokens()
+        print("reflection_prompt_tokens: ", reflection_prompt_tokens)
+        print("reflection_completion_tokens: ", reflection_completion_tokens)
+        end_time = time.time()
+
+    elif args.dataset == "real":
+        evaluator = Evaluator(have_truth=True)
+        with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
                   encoding='utf-8') as f:
-            json.dump(result, f, indent=4, ensure_ascii=False)
+            all_data = json.load(f)
+        requires = all_data
+        print("The total number: " + str(len(requires)))
 
-        step += 1
+        for index, item in tqdm(enumerate(requires)):
+            query = item["input"]
+            target_place = item["target_place"][0]
+            if not os.path.exists(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}')):
+                os.makedirs(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}'))
+            if not os.path.exists(
+                    os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')):
+                result = [{}]
+            else:
+                result = json.load(
+                    open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json')))
+            try:
+                planner_results, scratchpad, action_log = agent.run(query=query, place=target_place, index=index)
 
-        evaluator.evaluate(agent_output=planner_results, externel_data=data)
+                if planner_results == 'Max Token Length Exceeded.':
+                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                    result[-1][f'{args.model_name}_two-stage_results'] = 'Max Token Length Exceeded.'
+                    action_log[-1]['state'] = 'Max Token Length of Planner Exceeded.'
+                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
+                else:
+                    result[-1][f'{args.model_name}_two-stage_query'] = query
+                    result[-1][f'{args.model_name}_two-stage_results_logs'] = scratchpad
+                    result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+                    result[-1][f'{args.model_name}_two-stage_action_logs'] = action_log
 
-    evaluator.print_result(args.mode, args.model_name)
-    prompt_tokens, completion_tokens = agent.get_tokens()
-    print("prompt_tokens: ", prompt_tokens)
-    print("completion_tokens: ", completion_tokens)
+                # write to json file
+                with open(os.path.join(f'{args.output_dir}/{args.dataset}/{args.mode}/generated_plan_{index}.json'),
+                          'w') as f:
+                    json.dump(result, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                print("Error in results")
+                print(e)
+                planner_results = "Error in results"
+                result[-1][f'{args.model_name}_two-stage_query'] = query
+                result[-1][f'{args.model_name}_two-stage_results_logs'] = None
+                result[-1][f'{args.model_name}_two-stage_results'] = planner_results
+                result[-1][f'{args.model_name}_two-stage_action_logs'] = None
+            evaluator.evaluate_real(agent_output=planner_results, target_place=item["target_place"],
+                                    query=query, truth=item["route"])
 
-    eval_prompt_tokens, eval_completion_tokens = agent.get_evaluator_tokens()
-    print("eval_prompt_tokens: ", eval_prompt_tokens)
-    print("eval_completion_tokens: ", eval_completion_tokens)
+        evaluator.print_real_result(args.mode, args.model_name)
+        prompt_tokens, completion_tokens = agent.get_tokens()
+        print("prompt_tokens: ", prompt_tokens)
+        print("completion_tokens: ", completion_tokens)
 
-    reflection_prompt_tokens, reflection_completion_tokens = agent.get_reflection_tokens()
-    print("reflection_prompt_tokens: ", reflection_prompt_tokens)
-    print("reflection_completion_tokens: ", reflection_completion_tokens)
-    end_time = time.time()
+        eval_prompt_tokens, eval_completion_tokens = agent.get_evaluator_tokens()
+        print("eval_prompt_tokens: ", eval_prompt_tokens)
+        print("eval_completion_tokens: ", eval_completion_tokens)
+
+        reflection_prompt_tokens, reflection_completion_tokens = agent.get_reflection_tokens()
+        print("reflection_prompt_tokens: ", reflection_prompt_tokens)
+        print("reflection_completion_tokens: ", reflection_completion_tokens)
+
+        end_time = time.time()
 
     print(f"Time taken: {end_time - start_time} seconds")
