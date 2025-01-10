@@ -225,8 +225,8 @@ class Solver:
 
         self.answer = ''
         self.max_steps = max_steps
-        self.evaluate_llm = EvaluatorLLM()
-        self.reflect_llm = ReflectionLLM()
+        self.evaluate_llm = EvaluatorLLM(llm_name=react_llm_name)
+        self.reflect_llm = ReflectionLLM(llm_name=react_llm_name)
 
         self.mode = mode
         self.react_name = react_llm_name
@@ -239,7 +239,7 @@ class Solver:
             print("LLM's name is getting wrong")
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
-        if self.mode == 'our':
+        if self.mode == 'our' or self.mode == 'our_w_reflection' or self.mode == 'our_w_evaluation':
             self.agent_prompt = solver_instruction
         elif self.mode == 'route_bm25_RAG_zh':
             self.agent_prompt = solver_routes_instruction
@@ -306,15 +306,16 @@ class Solver:
             self.retry_record['invalidAction'] += 1
             print(f'Invalid Thought or Action: {generate_text}')
             self.json_log[-1]["Thought"] = generate_text
-            self.current_observation = '您生成了一条非法指令，请检查您的指令是否正确，需要重新以“Thought”、“Action”的指令格式生成接下来的规划与行动，已经搜集完足够信息后，请调用Planner工具得到最终的路线规划。'
+            self.current_observation = f'Observation {self.step_n}: 您生成了一条非法指令，请检查您的指令是否正确，需要重新以“Thought”、“Action”的指令格式生成接下来的规划与行动，已经搜集完足够信息后，请调用Planner工具得到最终的路线规划。'
             self.scratchpad += self.current_observation
             self.json_log[-1]['state'] = f'invalidAction'
             self.step_n += 1
             return
-        self.scratchpad += f'\nThought {self.step_n}: {thought}. Action {self.step_n}: {action}'
+        self.scratchpad += f'\nThought {self.step_n}: {thought}. Action {self.step_n}: {action}\n'
 
         print(f"===============scratchpad {self.step_n}===================")
-
+        # print(self.scratchpad)
+        # print("----------------------------------")
 
         print(self.scratchpad.split('\n')[-1])
         # self.json_log[-1]['thought'] = self.scratchpad.split('\n')[-1].replace(f'Thought {self.step_n}:', "")
@@ -354,7 +355,7 @@ class Solver:
         # self.log_file.write(self.scratchpad.split('\n')[-1]+'\n')
 
         # Observe
-        self.scratchpad += f'\nObservation {self.step_n}: '
+        # self.scratchpad += f'\nObservation {self.step_n}: '
 
         if action == None or action == '' or action == '\n':
             action_type = None
@@ -509,7 +510,7 @@ class Solver:
                     print(e)
 
             elif action_type == "Planner":
-                if self.mode == 'our':
+                if self.mode == 'our' or self.mode == 'our_w_reflection' or self.mode == 'our_w_evaluation':
                     self.current_observation = str(
                         self.tools["planner"].run(self.scratchpad, query=action_arg, route=None))
                 elif self.mode == 'route_bm25_RAG_zh':
@@ -562,7 +563,7 @@ class Solver:
                 return "Error !"
 
     def _build_agent_prompt(self) -> str:
-        if self.mode == 'our':
+        if self.mode == 'our' or self.mode == 'our_w_reflection' or self.mode == 'our_w_evaluation':
             return self.agent_prompt.format(
                 query=self.query,
                 scratchpad=self.scratchpad
@@ -621,7 +622,23 @@ class Solver:
 
     def evaluate_observation(self, query, thought, action, observation):
         # Do not use self-reflection in the first step
-        if self.step_n == 1:
+        if self.mode == 'our_w_reflection':
+            if self.step_n == 1:
+                self.scratchpad += f'Observation {self.step_n}: {observation}\n'
+                self.current_observation = observation
+                self.json_log[-1]['state'] = f'Successful Reflection'
+            else:
+                reflection, summary = self.reflect_llm.run(query, self.scratchpad)
+                if reflection == 'Success':
+                    self.scratchpad += f'Observation {self.step_n}: {observation}\n'
+                    self.current_observation = observation
+                    self.json_log[-1]['state'] = f'Successful Reflection'
+                else:
+                    self.scratchpad += f'Observation {self.step_n}: {summary}\n'
+                    self.current_observation = summary
+                    self.json_log[-1]['state'] = f'Unsuccessful Reflection'
+
+        elif self.mode== 'our_w_evaluation':
             tag, evaluate = self.evaluate_llm.run(query, thought, action, observation)
             self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
             self.current_observation = evaluate
@@ -630,8 +647,7 @@ class Solver:
             else:
                 self.json_log[-1]['state'] = f'Unsuccessful Evaluation'
         else:
-            reflection, summary = self.reflect_llm.run(query, self.scratchpad)
-            if reflection == 'Success':
+            if self.step_n == 1:
                 tag, evaluate = self.evaluate_llm.run(query, thought, action, observation)
                 self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
                 self.current_observation = evaluate
@@ -640,9 +656,19 @@ class Solver:
                 else:
                     self.json_log[-1]['state'] = f'Unsuccessful Evaluation'
             else:
-                self.scratchpad += f'Observation {self.step_n}: {summary}\n'
-                self.current_observation = summary
-                self.json_log[-1]['state'] = f'Unsuccessful Reflection'
+                reflection, summary = self.reflect_llm.run(query, self.scratchpad)
+                if reflection == 'Success':
+                    tag, evaluate = self.evaluate_llm.run(query, thought, action, observation)
+                    self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
+                    self.current_observation = evaluate
+                    if tag == 'Success':
+                        self.json_log[-1]['state'] = f'Successful Evaluation'
+                    else:
+                        self.json_log[-1]['state'] = f'Unsuccessful Evaluation'
+                else:
+                    self.scratchpad += f'Observation {self.step_n}: {summary}\n'
+                    self.current_observation = summary
+                    self.json_log[-1]['state'] = f'Unsuccessful Reflection'
 
     def get_evaluator_log(self):
         return self.evaluate_llm.get_logs()
@@ -695,16 +721,16 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default="deepseek-chat")
+    parser.add_argument("--model_name", type=str, default='glm-4-air')
     parser.add_argument("--output_dir", type=str, default="./logs")
-    parser.add_argument("--dataset", type=str, default="real")
-    parser.add_argument("--mode", type=str, default='route_bm25_RAG_zh')
+    parser.add_argument("--dataset", type=str, default="fake")
+    parser.add_argument("--mode", type=str, default='our')
     args = parser.parse_args()
     print(args)
 
     # planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
     agent = Solver(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name)
-    args.mode = 'all_real_deepseek'
+    args.mode = 'all_test_glm-4_fake_combine1'
     start_time = time.time()
     evaluator = Evaluator()
     if args.dataset == "fake":
