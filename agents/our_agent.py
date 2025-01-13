@@ -38,6 +38,8 @@ class ReflectionLLM:
             self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         elif 'deepseek' in llm_name:
             self.llm = LLMs(model_name=llm_name, api_key='sk-e69d66ca01ec4426ad1864e14177a8b3' ,rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+        elif 'gpt-4o' in llm_name:
+            self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
         if mode == 'our':
             self.agent_prompt = reflection_instruction
@@ -95,7 +97,7 @@ class ReflectionLLM:
         while True:
             try:
                 # print(self._build_agent_prompt())
-                if 'glm-4' in self.llm_name or 'deepseek' in self.llm_name:
+                if 'glm-4' in self.llm_name or 'deepseek' in self.llm_name or 'gpt-4o' in self.llm_name:
                     request = format_step(self.llm(self._build_agent_prompt()))
                 else:
                     # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
@@ -129,6 +131,8 @@ class EvaluatorLLM:
             self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         elif 'deepseek' in llm_name:
             self.llm = LLMs(model_name=llm_name, api_key='sk-a0750ae6f78a4ddfb648d18e65b20ce0' ,rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+        elif 'gpt-4o' in llm_name:
+            self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
         if mode == 'our':
             self.agent_prompt = evaluator_instruction
@@ -186,7 +190,7 @@ class EvaluatorLLM:
         while True:
             try:
                 # print(self._build_agent_prompt())
-                if 'glm-4' in self.llm_name or 'deepseek' in self.llm_name:
+                if 'glm-4' in self.llm_name or 'deepseek' in self.llm_name or 'gpt-4o' in self.llm_name:
                     request = format_step(self.llm(self._build_agent_prompt()))
                 else:
                     # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
@@ -233,7 +237,7 @@ class Solver:
         self.planner_mode = mode
         self.planner_name = react_llm_name
 
-        if 'glm-4' in react_llm_name or "deepseek-chat" in react_llm_name:
+        if 'glm-4' in react_llm_name or "deepseek-chat" in react_llm_name or "gpt-4o" in react_llm_name:
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
             print("LLM's name is getting wrong")
@@ -315,9 +319,9 @@ class Solver:
 
         print(f"===============scratchpad {self.step_n}===================")
         # print(self.scratchpad)
+        print(f'\nThought {self.step_n}: {thought}. Action {self.step_n}: {action}\n')
         # print("----------------------------------")
 
-        print(self.scratchpad.split('\n')[-1])
         # self.json_log[-1]['thought'] = self.scratchpad.split('\n')[-1].replace(f'Thought {self.step_n}:', "")
         self.json_log[-1]['thought'] = thought
         # self.log_file.write(self.scratchpad.split('\n')[-1] + '\n')
@@ -550,7 +554,7 @@ class Solver:
         while True:
             try:
                 # print(self._build_agent_prompt())
-                if 'glm-4' in self.react_name or 'deepseek' in self.react_name:
+                if 'glm-4' in self.react_name or 'deepseek' in self.react_name or 'gpt-4o' in self.react_name:
                     request = format_step(self.llm(self._build_agent_prompt()))
                 else:
                     # request = format_step(self.llm([HumanMessage(content=self._build_agent_prompt())]).content)
@@ -721,8 +725,8 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default='glm-4-air')
-    parser.add_argument("--output_dir", type=str, default="./logs")
+    parser.add_argument("--model_name", type=str, default="gpt-4o-mini")
+    parser.add_argument("--output_dir", type=str, default="./logs_gpt-4o")
     parser.add_argument("--dataset", type=str, default="fake")
     parser.add_argument("--mode", type=str, default='our')
     args = parser.parse_args()
@@ -730,7 +734,7 @@ if __name__ == '__main__':
 
     # planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
     agent = Solver(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name)
-    args.mode = 'all_test_glm-4_fake_combine1'
+    args.mode = 'all_test_gpt-4o_fake_micro-planning'
     start_time = time.time()
     evaluator = Evaluator()
     if args.dataset == "fake":

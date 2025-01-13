@@ -153,7 +153,7 @@ class ReactAgent:
 
         self.evaluate_llm = EvaluatorLLM()
 
-        if 'glm-4' in react_llm_name or "deepseek-chat" in react_llm_name:
+        if 'glm-4' in react_llm_name or "deepseek-chat" in react_llm_name or 'gpt-4o' in react_llm_name:
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
             print("LLM's name is getting wrong")
@@ -237,7 +237,7 @@ class ReactAgent:
             self.retry_record['invalidAction'] += 1
             print(f'Invalid Thought or Action: {generate_text}')
             self.json_log[-1]["Thought"] = generate_text
-            self.current_observation = '您生成了一条非法指令，请检查您的指令是否正确，需要重新以“Thought”、“Action”的指令格式生成接下来的规划与行动，已经搜集完足够信息后，请调用Planner工具得到最终的路线规划。'
+            self.current_observation = f'Observation {self.step_n}: 您生成了一条非法指令，请检查您的指令是否正确，需要重新以“Thought”、“Action”的指令格式生成接下来的规划与行动，已经搜集完足够信息后，请调用Planner工具得到最终的路线规划。'
             self.scratchpad += self.current_observation
             self.json_log[-1]['state'] = f'invalidAction'
             self.step_n += 1
@@ -286,7 +286,7 @@ class ReactAgent:
         # self.log_file.write(self.scratchpad.split('\n')[-1]+'\n')
 
         # Observe
-        self.scratchpad += f'\nObservation {self.step_n}: '
+        # self.scratchpad += f'\nObservation {self.step_n}: '
 
         if action == None or action == '' or action == '\n':
             action_type = None
@@ -581,10 +581,15 @@ class ReactAgent:
 
 
     def evaluate_observation(self, query, thought, action, observation):
-        evaluate = self.evaluate_llm.run(query, thought, action, observation)
-        self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
-        self.current_observation = evaluate
-        print(evaluate)
+        if self.mode == 'zero_shot_zh':
+            self.scratchpad += f'Observation {self.step_n}: {observation}\n'
+            self.current_observation = observation
+            return
+        else:
+            evaluate = self.evaluate_llm.run(query, thought, action, observation)
+            self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
+            self.current_observation = evaluate
+            print(evaluate)
     def get_evaluator_log(self):
         return self.evaluate_llm.get_logs()
 
@@ -684,10 +689,10 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default='deepseek-chat')
-    parser.add_argument("--output_dir", type=str, default="./logs_deepseek")
-    parser.add_argument("--dataset", type=str, default="simulated")
-    parser.add_argument("--mode", type=str, default='test2')
+    parser.add_argument("--model_name", type=str, default="gpt-4o-mini")
+    parser.add_argument("--output_dir", type=str, default="./logs_gpt-4o")
+    parser.add_argument("--dataset", type=str, default="fake")
+    parser.add_argument("--mode", type=str, default='zero_shot_zh')
     args = parser.parse_args()
     print(args)
     if args.mode == 'reflection_zh':

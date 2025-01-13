@@ -22,6 +22,9 @@ class LLMs:
         elif model_name == 'deepseek-chat':
             print("Using deepseek-chat")
             self.model = OpenAI(api_key="sk-a416cf4db0f246ae9fd6f9c620e11d9f", base_url="https://api.deepseek.com")
+        elif 'gpt-4o' in model_name:
+            print("Using gpt-4o")
+            self.model = OpenAI(api_key="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", base_url="https://openrouter.ai/api/v1")
 
 
         self.prompt_token = 0
