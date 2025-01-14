@@ -319,8 +319,8 @@ class Solver:
 
         print(f"===============scratchpad {self.step_n}===================")
         # print(self.scratchpad)
-        print(f'\nThought {self.step_n}: {thought}. Action {self.step_n}: {action}\n')
-        # print("----------------------------------")
+        print(f'\nThought {self.step_n}: {thought}. Action {self.step_n}: {action}')
+        print("----------------------------------")
 
         # self.json_log[-1]['thought'] = self.scratchpad.split('\n')[-1].replace(f'Thought {self.step_n}:', "")
         self.json_log[-1]['thought'] = thought
@@ -628,23 +628,23 @@ class Solver:
         # Do not use self-reflection in the first step
         if self.mode == 'our_w_reflection':
             if self.step_n == 1:
-                self.scratchpad += f'Observation {self.step_n}: {observation}\n'
+                self.scratchpad += f'Observation {self.step_n}: {observation}'
                 self.current_observation = observation
                 self.json_log[-1]['state'] = f'Successful Reflection'
             else:
                 reflection, summary = self.reflect_llm.run(query, self.scratchpad)
                 if reflection == 'Success':
-                    self.scratchpad += f'Observation {self.step_n}: {observation}\n'
+                    self.scratchpad += f'Observation {self.step_n}: {observation}'
                     self.current_observation = observation
                     self.json_log[-1]['state'] = f'Successful Reflection'
                 else:
-                    self.scratchpad += f'Observation {self.step_n}: {summary}\n'
+                    self.scratchpad += f'Observation {self.step_n}: {summary}'
                     self.current_observation = summary
                     self.json_log[-1]['state'] = f'Unsuccessful Reflection'
 
         elif self.mode== 'our_w_evaluation':
             tag, evaluate = self.evaluate_llm.run(query, thought, action, observation)
-            self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
+            self.scratchpad += f'Observation {self.step_n}: {evaluate}'
             self.current_observation = evaluate
             if tag == 'Success':
                 self.json_log[-1]['state'] = f'Successful Evaluation'
@@ -653,7 +653,7 @@ class Solver:
         else:
             if self.step_n == 1:
                 tag, evaluate = self.evaluate_llm.run(query, thought, action, observation)
-                self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
+                self.scratchpad += f'Observation {self.step_n}: {evaluate}'
                 self.current_observation = evaluate
                 if tag == 'Success':
                     self.json_log[-1]['state'] = f'Successful Evaluation'
@@ -663,14 +663,14 @@ class Solver:
                 reflection, summary = self.reflect_llm.run(query, self.scratchpad)
                 if reflection == 'Success':
                     tag, evaluate = self.evaluate_llm.run(query, thought, action, observation)
-                    self.scratchpad += f'Observation {self.step_n}: {evaluate}\n'
+                    self.scratchpad += f'Observation {self.step_n}: {evaluate}'
                     self.current_observation = evaluate
                     if tag == 'Success':
                         self.json_log[-1]['state'] = f'Successful Evaluation'
                     else:
                         self.json_log[-1]['state'] = f'Unsuccessful Evaluation'
                 else:
-                    self.scratchpad += f'Observation {self.step_n}: {summary}\n'
+                    self.scratchpad += f'Observation {self.step_n}: {summary}'
                     self.current_observation = summary
                     self.json_log[-1]['state'] = f'Unsuccessful Reflection'
 
@@ -734,7 +734,7 @@ if __name__ == '__main__':
 
     # planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
     agent = Solver(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name)
-    args.mode = 'all_test_gpt-4o_fake_micro-planning'
+    args.mode = 'all_test_gpt-4o_fake_test2'
     start_time = time.time()
     evaluator = Evaluator()
     if args.dataset == "fake":
