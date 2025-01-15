@@ -728,13 +728,13 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="gpt-4o-mini")
     parser.add_argument("--output_dir", type=str, default="./logs_gpt-4o")
     parser.add_argument("--dataset", type=str, default="fake")
-    parser.add_argument("--mode", type=str, default='our')
+    parser.add_argument("--mode", type=str, default='our_w_reflection')
     args = parser.parse_args()
     print(args)
 
     # planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
     agent = Solver(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name)
-    args.mode = 'all_test_gpt-4o_fake_test2'
+    args.mode = 'all_test_gpt-4o_with_reflection'
     start_time = time.time()
     evaluator = Evaluator()
     if args.dataset == "fake":

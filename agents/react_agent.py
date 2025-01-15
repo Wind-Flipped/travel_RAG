@@ -581,7 +581,7 @@ class ReactAgent:
 
 
     def evaluate_observation(self, query, thought, action, observation):
-        if self.mode == 'zero_shot_zh':
+        if self.mode == 'zero_shot_zh' or self.mode == 'route_bm25_RAG_zh':
             self.scratchpad += f'Observation {self.step_n}: {observation}\n'
             self.current_observation = observation
             return
@@ -691,8 +691,8 @@ if __name__ == '__main__':
     parser.add_argument("--set_type", type=str, default="test")
     parser.add_argument("--model_name", type=str, default="gpt-4o-mini")
     parser.add_argument("--output_dir", type=str, default="./logs_gpt-4o")
-    parser.add_argument("--dataset", type=str, default="fake")
-    parser.add_argument("--mode", type=str, default='zero_shot_zh')
+    parser.add_argument("--dataset", type=str, default="real")
+    parser.add_argument("--mode", type=str, default='route_bm25_RAG_zh')
     args = parser.parse_args()
     print(args)
     if args.mode == 'reflection_zh':
