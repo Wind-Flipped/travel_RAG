@@ -17,7 +17,7 @@ class LLMs:
         # 初始化大模型
         self.model_name = model_name
         self.temperature = temperature
-        if model_name == 'glm-4-air':
+        if 'glm-4' in model_name:
             self.model = ZhipuAI(api_key=api_key)
         elif model_name == 'deepseek-chat':
             print("Using deepseek-chat")
