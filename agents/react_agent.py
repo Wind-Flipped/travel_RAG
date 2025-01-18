@@ -689,10 +689,10 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default="gpt-4o-mini")
-    parser.add_argument("--output_dir", type=str, default="./logs_gpt-4o")
-    parser.add_argument("--dataset", type=str, default="real")
-    parser.add_argument("--mode", type=str, default='route_bm25_RAG_zh')
+    parser.add_argument("--model_name", type=str, default="glm-4-air")
+    parser.add_argument("--output_dir", type=str, default="./logs_glm-4")
+    parser.add_argument("--dataset", type=str, default="fake")
+    parser.add_argument("--mode", type=str, default='zero_shot_zh')
     args = parser.parse_args()
     print(args)
     if args.mode == 'reflection_zh':
@@ -702,6 +702,8 @@ if __name__ == '__main__':
     agent = ReactAgent(mode=args.mode, tools=tools_list, max_steps=max_steps, react_llm_name=args.model_name,
                        planner_llm_name=args.model_name, planner_mode=args.mode)
     start_time = time.time()
+
+    args.mode = "zero_shot_zh_new_prompt"
 
     if args.mode == 'route_RAG_zh' or args.mode == 'route_bm25_RAG_zh':
         evaluator = Evaluator(have_truth=True)

@@ -1,5 +1,7 @@
 import re, string, os, sys
-
+import os
+os.environ["https_proxy"] = "http://localhost:7890"
+os.environ["http_proxy"] = "http://localhost:7890"
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 from typing import List, Dict, Any
 from pandas import DataFrame
@@ -295,6 +297,17 @@ class Solver:
 
         while not self.is_halted() and not self.is_finished():
             self.step()
+
+        if not self.is_finished():
+            if self.mode == 'our' or self.mode == 'our_w_reflection' or self.mode == 'our_w_evaluation':
+                self.answer = str(
+                    self.tools["planner"].run(self.scratchpad, query=query, route=None))
+            elif self.mode == 'route_bm25_RAG_zh':
+                self.answer = str(
+                    self.tools["planner"].run(self.scratchpad, query=query, route=self.route_info))
+            print("Fail to generate a valid route. Begin Try again---")
+            print(self.answer)
+            print("End Try again---")
 
         return self.answer, self.scratchpad, self.json_log
 
@@ -727,16 +740,16 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default="glm-4-air")
-    parser.add_argument("--output_dir", type=str, default="./logs_glm-4")
-    parser.add_argument("--dataset", type=str, default="fake")
-    parser.add_argument("--mode", type=str, default='our')
+    parser.add_argument("--model_name", type=str, default="gpt-4o-mini")
+    parser.add_argument("--output_dir", type=str, default="./logs_gpt-4o-mini")
+    parser.add_argument("--dataset", type=str, default="real")
+    parser.add_argument("--mode", type=str, default='our_w_reflection')
     args = parser.parse_args()
     print(args)
 
     # planner_agent = Planner(mode=args.mode, llm_name=args.model_name)
     agent = Solver(mode=args.mode, tools=tools_list, max_steps=10, react_llm_name=args.model_name)
-    args.mode = 'all_test_glm-4-_BiPLAY2'
+    args.mode = 'baseline_gpt-4o-mini_real_reflexion'
     start_time = time.time()
     evaluator = Evaluator()
     if args.dataset == "fake":
@@ -789,7 +802,7 @@ if __name__ == '__main__':
 
     elif args.dataset == "real":
         evaluator = Evaluator(have_truth=True)
-        with open(f"/home/wangb/cyo/graduation/rag/databases/hangzhou/key_place2_requests.json", 'r',
+        with open(f"./agents/rag/databases/hangzhou/key_place2_requests.json", 'r',
                   encoding='utf-8') as f:
             all_data = json.load(f)
         requires = all_data

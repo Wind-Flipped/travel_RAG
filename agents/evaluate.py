@@ -4,7 +4,7 @@ import re, json
 import numpy as np
 import json
 import math
-from llms import LLMs
+# from llms import LLMs
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./")))
 from tools.apis import Restaurants, Attractions
@@ -38,11 +38,11 @@ class Evaluator:
         self.valid_distance = 0
         self.avg_score = 0
         self.valid_score = 0
-        self.llm = LLMs()
+        # self.llm = LLMs()
         self.eval_log = []
 
         if have_truth:
-            self.embedding_model = Zhipuembedding(api_key=api_key)
+            # self.embedding_model = Zhipuembedding(api_key=api_key)
 
             # with open("/home/wangb/cyo/graduation/rag/databases/popularity.json", 'r', encoding='utf-8') as f:
             #     data = json.load(f)
@@ -128,7 +128,7 @@ class Evaluator:
                 #     all_flag = False
 
                 self.all_num += 1 if all_flag else 0
-                self.calculate_ai_similarity(attraction_list, query)
+                # self.calculate_ai_similarity(attraction_list, query)
 
                 score = self.calculate_jaccard_similarity(attraction_list, truth)
                 self.jaccard_similarity += score
@@ -146,9 +146,9 @@ class Evaluator:
                 # self.popularity_similarity += score
                 # self.eval_log[-1]["popularity_similarity"] = score
 
-                score = self.calculate_request2route(attraction_list, truth)
-                self.request2route += score
-                self.eval_log[-1]["request2route"] = score
+                # score = self.calculate_request2route(attraction_list, truth)
+                # self.request2route += score
+                # self.eval_log[-1]["request2route"] = score
 
                 score = self.calculate_center_distance(attraction_list, truth)
                 self.center_distance += score
@@ -223,7 +223,7 @@ class Evaluator:
                 #     all_flag = False
 
                 self.all_num += 1 if all_flag else 0
-                self.calculate_ai_similarity(attraction_list, query)
+                # self.calculate_ai_similarity(attraction_list, query)
 
                 score = self.calculate_jaccard_similarity(attraction_list, truth)
                 self.jaccard_similarity += score
@@ -241,9 +241,9 @@ class Evaluator:
                 # self.popularity_similarity += score
                 # self.eval_log[-1]["popularity_similarity"] = score
 
-                score = self.calculate_request2route(attraction_list, truth)
-                self.request2route += score
-                self.eval_log[-1]["request2route"] = score
+                # score = self.calculate_request2route(attraction_list, truth)
+                # self.request2route += score
+                # self.eval_log[-1]["request2route"] = score
 
                 score = self.calculate_center_distance(attraction_list, truth)
                 self.center_distance += score
