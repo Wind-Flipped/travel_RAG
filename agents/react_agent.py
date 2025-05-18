@@ -153,7 +153,7 @@ class ReactAgent:
 
         self.evaluate_llm = EvaluatorLLM()
 
-        if 'glm-4' in react_llm_name or "deepseek-chat" in react_llm_name or 'gpt-4o' in react_llm_name:
+        if 'glm-4' in react_llm_name or "deepseek-chat" in react_llm_name or 'gpt-4o' in react_llm_name or "Qwen3" in react_llm_name:
             self.llm = LLMs(model_name= react_llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
             print("LLM's name is getting wrong")
@@ -689,8 +689,8 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default="glm-4-air")
-    parser.add_argument("--output_dir", type=str, default="./logs_glm-4")
+    parser.add_argument("--model_name", type=str, default="Qwen3-8B")
+    parser.add_argument("--output_dir", type=str, default="./logs_Qwen3-8B")
     parser.add_argument("--dataset", type=str, default="fake")
     parser.add_argument("--mode", type=str, default='zero_shot_zh')
     args = parser.parse_args()

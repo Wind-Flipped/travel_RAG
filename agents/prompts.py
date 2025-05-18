@@ -50,16 +50,16 @@ ZEROSHOT_REACT_INSTRUCTION_ZH = '''你是旅行路线规划和工具使用方面
 -你最多可以有10个“Action”步骤。因此，您必须在第10个行动或更早的时候调用Planner工具。
 - **Action类型：**您可以使用六种不同的Action类型。
 ###Action 类型：
-1. **RestaurantInfo(餐馆的名字):**
+1. **RestaurantInfo[餐馆的名字]:**
 - **Description**：检索特定餐厅的餐厅信息。
-—**参数**：餐厅名称（例如：RestaurantInfo[Hotpot]）
+—**参数**：餐厅名称（例如：RestaurantInfo[西风城火锅]）
 - **功能**：返回包括纬度、经度、菜肴类型和人均成本在内的信息。
 - **注**：仅当数据库中存在该餐厅时使用。
 2. **RestaurantSearch[经度，纬度，餐厅数量]**：
 - **描述**：根据给定的经度和纬度检索附近的餐厅信息。
 - **参数**：经度、纬度、餐厅数量
 - **功能**：提供最近的餐馆的列表与指定的条目数。
-3. **AttractionInfo(景点名称):**
+3. **AttractionInfo[景点名称]:**
 - **描述**：检索有关特定景点的信息。
 - **参数**：景点名称（例如，AttractionInfo[紫禁城]）
 - **功能**：返回吸引力的细节，如坐标。

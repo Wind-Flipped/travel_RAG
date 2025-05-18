@@ -3,12 +3,15 @@ import sys, os
 # sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./agents")))
 from agents.prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
 from openai import OpenAI
-
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
 from agents.rag.component.embedding import Zhipuembedding
 from agents.rag.component.data_chunker import ReadFile
 from agents.rag.component.databases import Vectordatabase
 from agents.rag.component.request import Request
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '1, 2'
 
 class LLMs:
     def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
@@ -25,24 +28,82 @@ class LLMs:
         elif 'gpt-4o' in model_name:
             print("Using gpt-4o")
             self.model = OpenAI(api_key="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", base_url="https://openrouter.ai/api/v1")
+        elif 'Qwen3' in model_name:
+            print("Using Qwen3")
+            model_path = "/home/wangb/lyq/rl/X-R1/Qwen3-8B/Qwen/Qwen3-8B"
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16,
+                device_map="auto"
+            )
 
 
         self.prompt_token = 0
         self.completion_token = 0
 
+    def generate_response(self, user_input):
+        messages = self.history + [{"role": "user", "content": user_input}]
+
+        text = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+
+        inputs = self.tokenizer(text, return_tensors="pt")
+        response_ids = self.model.generate(**inputs, max_new_tokens=32768)[0][
+                       len(inputs.input_ids[0]):].tolist()
+        response = self.tokenizer.decode(response_ids, skip_special_tokens=True)
+
+        # Update history
+        self.history.append({"role": "user", "content": user_input})
+        self.history.append({"role": "assistant", "content": response})
+
+        return response
+
     # 定义chat方法
     def __call__(self, prompt: str, stop: list = None):
-        response = self.model.chat.completions.create(
-            model=self.model_name,
-            stop = stop,
-            messages=[
-                {"role": "user", "content": prompt},
-            ]
-        )
-        self.prompt_token += response.usage.prompt_tokens
-        self.completion_token += response.usage.completion_tokens
+        if "Qwen3" in self.model_name:
+            text = self.tokenizer.apply_chat_template(
+                [
+                    {"role": "user", "content": prompt},
+                ],
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False  # Switches between thinking and non-thinking modes. Default is True.
+            )
+            model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
 
-        return response.choices[0].message.content
+            # conduct text completion
+            generated_ids = self.model.generate(
+                **model_inputs,
+                max_new_tokens=32768
+            )
+            output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist()
+
+            # parsing thinking content
+            try:
+                # rindex finding 151668 (</think>)
+                index = len(output_ids) - output_ids[::-1].index(151668)
+            except ValueError:
+                index = 0
+
+            thinking_content = self.tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip("\n")
+            content = self.tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
+            return content
+        else:
+            response = self.model.chat.completions.create(
+                model=self.model_name,
+                stop = stop,
+                messages=[
+                    {"role": "user", "content": prompt},
+                ]
+            )
+            self.prompt_token += response.usage.prompt_tokens
+            self.completion_token += response.usage.completion_tokens
+
+            return response.choices[0].message.content
 
 
     def get_model(self):

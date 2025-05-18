@@ -47,9 +47,9 @@ class BM25Param(object):
 
 
 class BM25(object):
-    _param_pkl = "C:\\代码\\travel_RAG\\agents\\rag\\BM25\\data\\param.pkl"
-    _docs_path = "C:\\代码\\travel_RAG\\agents\\rag\\BM25\\data\\data.txt"
-    _stop_words_path = "C:\\代码\\travel_RAG\\agents\\rag\\BM25\\data\\stop_words.txt"
+    _param_pkl = "/home/wangb/cyo/graduation/agents/rag/BM25/data/param.pkl"
+    _docs_path = "/home/wangb/cyo/graduation/agents/rag/BM25/data/data.txt"
+    _stop_words_path = "/home/wangb/cyo/graduation/agents/rag/BM25/data/stop_words.txt"
     _stop_words = []
 
     def __init__(self, docs=""):

@@ -71,7 +71,7 @@ class Planner:
         self.model_name = model_name
 
 
-        if 'glm-4' in model_name or "deepseek-chat" in model_name or 'gpt-4o' in model_name:
+        if 'glm-4' in model_name or "deepseek-chat" in model_name or 'gpt-4o' in model_name or "Qwen3" in model_name:
             self.llm = LLMs(model_name=self.model_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         else:
             print("LLM's name is getting wrong")
