@@ -689,8 +689,8 @@ if __name__ == '__main__':
     # model_name = ['gpt-3.5-turbo-1106','gpt-4-1106-preview','gemini','mistral-7B-32K','mixtral','ChatGLM3-6B-32K'][2]
     parser = argparse.ArgumentParser()
     parser.add_argument("--set_type", type=str, default="test")
-    parser.add_argument("--model_name", type=str, default="Qwen3-8B")
-    parser.add_argument("--output_dir", type=str, default="./logs_Qwen3-8B")
+    parser.add_argument("--model_name", type=str, default="Qwen3-8B-TP1")
+    parser.add_argument("--output_dir", type=str, default="./logs_Qwen3-8B-TP1")
     parser.add_argument("--dataset", type=str, default="fake")
     parser.add_argument("--mode", type=str, default='zero_shot_zh')
     args = parser.parse_args()

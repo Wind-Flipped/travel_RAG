@@ -1,9 +1,12 @@
 from zhipuai import ZhipuAI
 import sys, os
+os.environ['CUDA_VISIBLE_DEVICES'] = '1, 2'
+
 # sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "./agents")))
 from agents.prompts import zeroshot_react_agent_prompt, zeroshot_react_agent_prompt_zh, zeroshot_react_agent_prompt_reformat_zh
 from openai import OpenAI
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
 import torch
 
 from agents.rag.component.embedding import Zhipuembedding
@@ -11,7 +14,7 @@ from agents.rag.component.data_chunker import ReadFile
 from agents.rag.component.databases import Vectordatabase
 from agents.rag.component.request import Request
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1, 2'
+
 
 class LLMs:
     def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
@@ -30,13 +33,27 @@ class LLMs:
             self.model = OpenAI(api_key="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", base_url="https://openrouter.ai/api/v1")
         elif 'Qwen3' in model_name:
             print("Using Qwen3")
-            model_path = "/home/wangb/lyq/rl/X-R1/Qwen3-8B/Qwen/Qwen3-8B"
-            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-            self.model = AutoModelForCausalLM.from_pretrained(
+            # model_path = "/home/wangb/lyq/rl/X-R1/models/Qwen3-8B-GRPO-TP1"
+            # self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            # self.model = AutoModelForCausalLM.from_pretrained(
+            #     model_path,
+            #     torch_dtype=torch.bfloat16,
+            #     device_map="auto"
+            # )
+            # 加载原始模型
+            model_path = "/home/wangb/lyq/rl/X-R1/Qwen3-8B/Qwen/Qwen3-8B"  # 替换为你的原始模型路径
+            adapter_path = "/home/wangb/lyq/rl/X-R1/models/Qwen3-8B-GRPO-TP1"  # 替换为你的 Adapter 路径
+
+            # 加载原始模型
+            model = AutoModelForCausalLM.from_pretrained(
                 model_path,
-                torch_dtype=torch.bfloat16,
-                device_map="auto"
+                device_map="auto",  # 自动分配设备
+                torch_dtype=torch.bfloat16  # 使用 bfloat16 数据类型
             )
+
+            # 加载 Adapter
+            self.model = PeftModel.from_pretrained(model, adapter_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(adapter_path)
 
 
         self.prompt_token = 0
