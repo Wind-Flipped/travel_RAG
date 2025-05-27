@@ -28,9 +28,10 @@ def build_cumulative_prompts_from_json_files(folder_path):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
 
+
                     if isinstance(data, list) and len(data) > 0:
                         item = data[0]
-                        main_prompt = item.get("Qwen3-8B_two-stage_query", "")
+                        main_prompt = item.get("Qwen3-8B-TP1_two-stage_query", "")
                         if not main_prompt:
                             continue  # 跳过没有主prompt的文件
                         all_prompts.append(main_prompt)
@@ -40,7 +41,7 @@ def build_cumulative_prompts_from_json_files(folder_path):
                         last_observations.append("")
                         query_prompts.append(main_prompt)
 
-                        action_logs = item.get("Qwen3-8B_two-stage_action_logs", [])
+                        action_logs = item.get("Qwen3-8B-TP1_two-stage_action_logs", [])
                         if not isinstance(action_logs, list):
                             continue  # 跳过没有action logs的文件
 
@@ -73,7 +74,7 @@ def build_cumulative_prompts_from_json_files(folder_path):
 
 
 # 使用示例
-folder_path = "/home/wangb/cyo/graduation/logs_Qwen3-8B/test/zero_shot_zh_new_prompt"  # 替换为你的JSON文件夹路径
+folder_path = "logs_Qwen3-8B-TP1/test/zero_shot_zh_new_prompt"  # 替换为你的JSON文件夹路径
 prompts, last_prompts, last_thoughts, last_actions, last_observations, query_prompts = build_cumulative_prompts_from_json_files(folder_path)
 
 # 打印前几个prompts作为示例
@@ -107,4 +108,5 @@ dataset_dict = {
 # 转换为 Dataset
 dataset = Dataset.from_dict(dataset_dict)
 print(dataset)
-dataset.save_to_disk("/home/wangb/cyo/graduation/data/rl_TP2")  # 保存为 Dataset 目录（推荐）
+dataset.save_to_disk("data/rl_TP2")  # 保存为 Dataset 目录（推荐）
+print(dataset["prompt"][0])
