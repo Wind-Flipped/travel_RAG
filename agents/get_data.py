@@ -8,7 +8,7 @@ from util.calculate import calculate_distance
 # data_path = "../MediaCrawler-main/MediaCrawler-main/data/xhs/json/"
 
 class GenerateRequest:
-    def __init__(self, have_truth = False, api_key = "c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE"):
+    def __init__(self, have_truth = False, api_key = ""):
         self.restaurant = Restaurants()
         self.attraction = Attractions()
         self.step = 0
@@ -53,7 +53,7 @@ def get_rawdata():
 
     responses = set()
 
-    client = ZhipuAI(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE")
+    client = ZhipuAI(api_key="")
 
     for index, note in enumerate(data):
         try:

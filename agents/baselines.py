@@ -11,7 +11,7 @@ import time
 
 class LLMs:
     def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
-                 api_key = "c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE",
+                 api_key = "",
                  rag_database: str = "/home/wangb/cyo/graduation/rag/databases/hangzhou") -> None:
         # 初始化大模型
         self.model_name = model_name
@@ -20,10 +20,10 @@ class LLMs:
             self.model = ZhipuAI(api_key=api_key)
         elif model_name == 'deepseek-chat':
             print("Using deepseek-chat")
-            self.model = OpenAI(api_key="sk-a416cf4db0f246ae9fd6f9c620e11d9f", base_url="https://api.deepseek.com")
+            self.model = OpenAI(api_key="", base_url="https://api.deepseek.com")
         elif 'gpt-4o' in model_name:
             print("Using gpt-4o")
-            self.model = OpenAI(api_key="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", base_url="https://openrouter.ai/api/v1")
+            self.model = OpenAI(api_key="", base_url="https://openrouter.ai/api/v1")
 
 
         self.prompt_token = 0

@@ -1,0 +1,40 @@
+load_ratio 1
+总共有107条数据
+总共有309条数据
+embedding模型初始化
+Attractions loaded.
+总共有107条数据
+0it [00:00, ?it/s]0it [00:06, ?it/s]
+----------------------------------------
+请帮我推荐一条西湖一日游的旅游路线，要求是：省时省力，避人流，亲测有效，多选交通，早晨游览。除此，我还希望去西湖，法喜寺游玩。我希望我的交通时间在14分钟左右，交通距离在7千米左右。
+能否帮我规划一下西湖一日游的行程？我想要一条省时省力的路线，能够避开高峰人流，最好是您亲自验证过的有效方案。希望行程中多利用公共交通工具，并且能在早晨开始游览。另外，我很想去西湖和法喜寺看看。理想的情况是，这两地之间的交通时间大约为14分钟，距离在7千米左右。
+Traceback (most recent call last):
+  File "/home/wangb/cyo/graduation/rag/component/infer.py", line 22, in <module>
+    pos_input, neg_input = llm.request_split(request)
+  File "/home/wangb/cyo/graduation/rag/component/llms.py", line 41, in request_split
+    return self.request_generator.extract_requests(input_txt)
+  File "/home/wangb/cyo/graduation/rag/component/request.py", line 55, in extract_requests
+    match = re.search(pattern, self.request2llm(request))
+  File "/home/wangb/cyo/graduation/rag/component/request.py", line 45, in request2llm
+    response = self.model.chat.completions.create(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/api_resource/chat/completions.py", line 94, in create
+    return self._post(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 809, in post
+    return cast(ResponseT, self.request(cast_type, opts, stream=stream, stream_cls=stream_cls))
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 495, in request
+    return self._request(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 567, in _request
+    return self._retry_request(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 622, in _retry_request
+    return self._request(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 567, in _request
+    return self._retry_request(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 622, in _retry_request
+    return self._request(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 567, in _request
+    return self._retry_request(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 622, in _retry_request
+    return self._request(
+  File "/home/wangb/.local/lib/python3.9/site-packages/zhipuai/core/_http_client.py", line 582, in _request
+    raise self._make_status_error(err.response) from None
+zhipuai.core._errors.APIReachLimitError: Error code: 429, with error text {"error":{"code":"1113","message":"您的账户已欠费，请充值后重试。"}}

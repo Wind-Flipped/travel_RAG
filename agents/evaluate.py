@@ -16,7 +16,7 @@ from prompts import evaluate_request_route_zh
 
 
 class Evaluator:
-    def __init__(self, have_truth = False, api_key = "c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE"):
+    def __init__(self, have_truth = False, api_key = ""):
         self.restaurant = Restaurants()
         self.attraction = Attractions()
         self.queries = []

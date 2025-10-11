@@ -18,7 +18,7 @@ from agents.rag.component.request import Request
 
 class LLMs:
     def __init__(self, model_name: str = 'glm-4-air', temperature: float = 0.9,
-                 api_key = "c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE",
+                 api_key = "",
                  rag_database: str = "/home/wangb/cyo/graduation/rag/databases/hangzhou") -> None:
         # 初始化大模型
         self.model_name = model_name
@@ -27,10 +27,10 @@ class LLMs:
             self.model = ZhipuAI(api_key=api_key)
         elif model_name == 'deepseek-chat':
             print("Using deepseek-chat")
-            self.model = OpenAI(api_key="sk-a416cf4db0f246ae9fd6f9c620e11d9f", base_url="https://api.deepseek.com")
+            self.model = OpenAI(api_key="", base_url="https://api.deepseek.com")
         elif 'gpt-4o' in model_name:
             print("Using gpt-4o")
-            self.model = OpenAI(api_key="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", base_url="https://openrouter.ai/api/v1")
+            self.model = OpenAI(api_key="", base_url="https://openrouter.ai/api/v1")
         elif 'Qwen3' in model_name:
             print("Using Qwen3")
             model_path = "/home/liuyq/X-R1/Qwen3-8B"
@@ -130,7 +130,7 @@ class LLMs:
         return self.prompt_token, self.completion_token
 
 class VectorDatabase:
-    def __init__(self, model = ZhipuAI(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE"),
+    def __init__(self, model = ZhipuAI(api_key=""),
                  index=-1,
                  model_name = "glm-4-air",
                  rag_database: list[str] = ["rag/databases/hangzhou",
@@ -142,7 +142,7 @@ class VectorDatabase:
         self.db_route.load_real_route(rag_database[2])
         self.db_poi = Vectordatabase()
         self.db_poi.load_vector(rag_database[1])
-        self.embedding_model = Zhipuembedding(api_key="c59db5e044cd9cd453a49b462a659697.RD2fEoEAwM5EhPuE")
+        self.embedding_model = Zhipuembedding(api_key="")
         self.model_name = model_name
         self.request_split = Request(model=model, model_name="glm-4-air")
 

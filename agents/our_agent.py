@@ -36,7 +36,7 @@ class ReflectionLLM:
         if 'glm-4' in llm_name:
             self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         elif 'deepseek' in llm_name:
-            self.llm = LLMs(model_name=llm_name, api_key='sk-e69d66ca01ec4426ad1864e14177a8b3' ,rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+            self.llm = LLMs(model_name=llm_name, api_key='' ,rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         elif 'gpt-4o' in llm_name:
             self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
@@ -130,7 +130,7 @@ class EvaluatorLLM:
         if 'glm-4' in llm_name:
             self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         elif 'deepseek' in llm_name:
-            self.llm = LLMs(model_name=llm_name, api_key='sk-a0750ae6f78a4ddfb648d18e65b20ce0' ,rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
+            self.llm = LLMs(model_name=llm_name, api_key='' ,rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
         elif 'gpt-4o' in llm_name:
             self.llm = LLMs(model_name=llm_name, rag_database="/home/wangb/cyo/graduation/rag/databases/hangzhou")
 
