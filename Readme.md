@@ -18,8 +18,9 @@ If you need to create or update a rag library, go to `databases.py`: change the 
 python databases.py 
 ```
 
-###Run
+### Run
 Run the main file
+
 ```bash
 cd ./agents
 python our_agent.py
